@@ -23,11 +23,10 @@ export default async function handler(req, res) {
 
   const { action, code, token, admin_pass } = req.body;
   
-  // GÜVENLİK GÜNCELLEMESİ: Şifre asla kodun içine yazılmaz. 
-  // Eğer Vercel'e ADMIN_PASS eklenmediyse, sistem kendini kapatır ve kimseye yetki vermez.
-  const GERCEK_ADMIN_SIFRESI = process.env.ADMIN_PASS; 
+  // GÜVENLİK GÜNCELLEMESİ: Şifre Vercel'deki SECURE_ADMIN_PASSWORD değişkeninden okunur.
+  const GERCEK_ADMIN_SIFRESI = process.env.SECURE_ADMIN_PASSWORD; 
 
-  // Eğer Vercel panelinde ADMIN_PASS tanımlanmadıysa veya gelen şifre boşsa/eşleşmiyorsa anında engelle
+  // Eğer Vercel panelinde SECURE_ADMIN_PASSWORD tanımlanmadıysa veya gelen şifre boşsa/eşleşmiyorsa engelle
   if (!GERCEK_ADMIN_SIFRESI || admin_pass !== GERCEK_ADMIN_SIFRESI) {
     if (action === 'toplu_yukle' || action === 'kodlari_indir') {
       return res.status(401).json({ error: 'Yetkisiz erişim! Yönetici şifresi geçersiz.' });
