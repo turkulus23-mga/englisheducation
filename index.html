@@ -941,19 +941,48 @@ window.addEventListener("DOMContentLoaded", async () => {
   const tetikleyici = urlParams.get("admin");
   const gizliSifre = urlParams.get("pass");
 
-  // Yönetici Toplu Kod Yükleme Alanı
-  if (tetikleyici === "yukle" && gizliSifre === "admin123") {
-    document.body.innerHTML = "<div style='text-align:center;padding:50px;font-family:sans-serif;'><h2>Veritabanı yüklemesi başlatıldı... Lütfen bekleyin.</h2></div>";
-    try {
-      const res = await fetch('/api/verify', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'toplu_yukle', code: gizliSifre })
-      });
-      const data = await res.json();
-      document.body.innerHTML = `<div style='text-align:center;padding:50px;font-family:sans-serif;'><h2>${data.message || "İşlem Tamamlandı!"}</h2></div>`;
-    } catch (err) {
-      document.body.innerHTML = `<div style='text-align:center;padding:50px;font-family:sans-serif;color:red;'><h2>Sistem Hatası: ${err.message}</h2></div>`;
+  // GÜVENLİ YÖNETİCİ MOTORU (Şifre veya üretim mantığı içermez, her şeyi backend'e sorar)
+  if ((tetikleyici === "yukle" || tetikleyici === "indir") && gizliSifre) {
+    document.body.innerHTML = `<div style='text-align:center;padding:50px;font-family:sans-serif;'><h2>Yönetici işlemi başlatıldı... Lütfen bekleyin.</h2></div>`;
+    
+    if (tetikleyici === "yukle") {
+      try {
+        const res = await fetch('/api/verify', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ action: 'toplu_yukle', admin_pass: gizliSifre })
+        });
+        const data = await res.json();
+        document.body.innerHTML = `<div style='text-align:center;padding:50px;font-family:sans-serif;'><h2>${data.message || data.error}</h2></div>`;
+      } catch (err) {
+        document.body.innerHTML = `<div style='text-align:center;padding:50px;font-family:sans-serif;color:red;'><h2>Sistem Hatası: ${err.message}</h2></div>`;
+      }
+    }
+
+    if (tetikleyici === "indir") {
+      try {
+        const res = await fetch('/api/verify', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ action: 'kodlari_indir', admin_pass: gizliSifre })
+        });
+        
+        if (!res.ok) {
+          const errData = await res.json();
+          throw new Error(errData.error || "Yetkisiz erişim!");
+        }
+        
+        const blob = await res.blob();
+        const link = document.createElement("a");
+        link.href = URL.createObjectURL(blob);
+        link.setAttribute("download", "ingilizce_defteri_aktivasyon_kodlari.csv");
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        document.body.innerHTML = "<div style='text-align:center;padding:50px;font-family:sans-serif;'><h2>✅ Kodlar sunucudan güvenli bir şekilde indirilmiştir.</h2></div>";
+      } catch (err) {
+        document.body.innerHTML = `<div style='text-align:center;padding:50px;font-family:sans-serif;color:red;'><h2>Güvenlik Hatası: ${err.message}</h2></div>`;
+      }
     }
     return;
   }
@@ -1003,3 +1032,4 @@ window.addEventListener("DOMContentLoaded", async () => {
 </script>
 </body>
 </html>
+
