@@ -493,7 +493,6 @@ KÜÇÜK TELEFON ≤ 390px
 </div>
 </div>
 
-<!-- Root dizine göre düzenlenmiş script dosyaları -->
 <script src="./grammar_A1.js"></script>
 <script src="./grammar_A2.js"></script>
 <script src="./grammar_B1.js"></script>
@@ -536,7 +535,7 @@ function chooseLevel(level){
   gate.style.display = "none";
   app.style.display = "flex";
 
-  // FIX: Kullanıcı seviye seçtiğinde uygulamanın ilk modunu tetikliyoruz.
+  // Seviye seçildiğinde varsayılan modu yükle
   setMode("vocabulary");
 }
 
@@ -566,7 +565,7 @@ function setMode(mode){
   document.querySelectorAll("#modeBar button")
     .forEach(btn => btn.classList.remove("modeActive"));
 
-  // FIX: Tırnak işareti hatası (Syntax Error) düzeltildi.
+  // DÜZELTİLEN SATIR: Tırnak işaretleri (backtick `) standart hale getirilerek syntax hatası giderildi.
   const activeBtn = document.querySelector(`#modeBar button[onclick="setMode('${mode}')"]`);
 
   if(activeBtn) activeBtn.classList.add("modeActive");
@@ -871,7 +870,7 @@ function updateStats(){
   document.getElementById("wrong").innerText = wrong;
 }
 
-/* ================= BOOTSTRAP (QR CODE URL PARSER) ================= */
+/* ================= BOOTSTRAP ================= */
 window.addEventListener("DOMContentLoaded", () => {
   const urlParams = new URLSearchParams(window.location.search);
   const urlLevel = urlParams.get("level");
