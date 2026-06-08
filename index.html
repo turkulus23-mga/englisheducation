@@ -440,7 +440,7 @@ KÜÇÜK TELEFON ≤ 390px
 </head>
 <body>
 
-<div id="levelGate">
+<div id="levelGate" style="display:none;">
 <div id="levelCard">
 <h2 class="levelTitle">Select Level</h2>
 
@@ -535,7 +535,6 @@ function chooseLevel(level){
   gate.style.display = "none";
   app.style.display = "flex";
 
-  // Seviye seçildiğinde varsayılan modu yükle
   setMode("vocabulary");
 }
 
@@ -565,7 +564,6 @@ function setMode(mode){
   document.querySelectorAll("#modeBar button")
     .forEach(btn => btn.classList.remove("modeActive"));
 
-  // DÜZELTİLEN SATIR: Tırnak işaretleri (backtick `) standart hale getirilerek syntax hatası giderildi.
   const activeBtn = document.querySelector(`#modeBar button[onclick="setMode('${mode}')"]`);
 
   if(activeBtn) activeBtn.classList.add("modeActive");
@@ -866,25 +864,141 @@ function syncEconomy(){
 }
 
 function updateStats(){
-  document.getElementById("correct").innerText = correct;
-  document.getElementById("wrong").innerText = wrong;
+  const cEl = document.getElementById("correct");
+  const wEl = document.getElementById("wrong");
+  if(cEl) cEl.innerText = correct;
+  if(wEl) wEl.innerText = wrong;
 }
 
-/* ================= BOOTSTRAP ================= */
-window.addEventListener("DOMContentLoaded", () => {
-  const urlParams = new URLSearchParams(window.location.search);
-  const urlLevel = urlParams.get("level");
-  const validLevels = ["A1", "A2", "B1", "B2", "C1"];
+/* ================= ELLE KOD GİRİŞİ İÇİN EKRAN OLUŞTURUCU ================= */
+function koduManuelGirisEkraniGoster(mesaj = "") {
+  const gate = document.getElementById("levelGate");
+  const app = document.getElementById("app");
+  if(gate) gate.style.display = "none";
+  if(app) app.style.display = "none";
 
-  if (urlLevel && validLevels.includes(urlLevel.toUpperCase())) {
-    chooseLevel(urlLevel.toUpperCase());
-  } else {
-    const levelGate = document.getElementById("levelGate");
-    if (levelGate) {
-      levelGate.style.display = "flex";
+  document.body.innerHTML = `
+    <div style="text-align:center; padding:20px; font-family:sans-serif; background:#000; height:100vh; display:flex; flex-direction:column; justify-content:center; align-items:center;">
+        <div style="background:#0f172a; padding:30px 20px; border-radius:20px; width:88%; max-width:400px; box-shadow: 0 10px 25px rgba(0,0,0,0.5);">
+            <h2 style="color:#facc15; font-size:24px; margin:0 0 10px 0;">⚠️ Aktivasyon Gerekli</h2>
+            <p style="color:#94a3b8; font-size:14px; line-height:1.5; margin:0 0 20px 0;">
+                Lütfen İngilizce Defterinizin üzerindeki QR kodu okutun veya aşağıdaki kutuya aktivasyon kodunuzu yazın.
+            </p>
+            
+            ${mesaj ? `<p style="color:#ef4444; font-weight:bold; font-size:13px; margin-bottom:15px;">${mesaj}</p>` : ''}
+            
+            <input type="text" id="manualCodeInput" placeholder="Örn: ENG-A1-001" style="width:100%; padding:14px; border-radius:10px; border:2px solid #334155; background:#1e293b; color:white; font-size:16px; font-weight:bold; text-align:center; text-transform:uppercase; margin-bottom:15px; outline:none;">
+            
+            <button id="btnVerifyCode" onclick="manuelKodOnayla()" style="width:100%; padding:14px; border:none; border-radius:10px; background:#2563eb; color:white; font-size:16px; font-weight:bold; cursor:pointer;">Kodu Aktifleştir</button>
+        </div>
+    </div>
+  `;
+}
+
+async function manuelKodOnayla() {
+  const input = document.getElementById("manualCodeInput");
+  if (!input) return;
+  
+  const girilenKod = input.value.trim().toUpperCase();
+  if (!girilenKod) {
+    alert("Lütfen bir kod giriniz!");
+    return;
+  }
+
+  const btn = document.getElementById("btnVerifyCode");
+  btn.innerText = "Kontrol Ediliyor...";
+  btn.disabled = true;
+
+  await kodDogrulamaIstegiGonder(girilenKod);
+}
+
+async function kodDogrulamaIstegiGonder(kod) {
+  try {
+    const res = await fetch('/api/verify', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'kontrol_et', code: kod })
+    });
+    const data = await res.json();
+
+    if (data.success) {
+        localStorage.setItem('user_auth_token', data.token);
+        alert(`Aktivasyon başarılı! Hoş geldiniz.`);
+        window.location.href = window.location.origin + window.location.pathname;
+    } else {
+        koduManuelGirisEkraniGoster(data.error);
+    }
+  } catch (error) {
+      alert("Sunucu bağlantı hatası: " + error.message);
+      koduManuelGirisEkraniGoster("Bağlantı hatası oluştu, lütfen tekrar deneyin.");
+  }
+}
+
+/* ================= AMBOS BOOTSTRAP VE GÜVENLİK MOTORU ================= */
+window.addEventListener("DOMContentLoaded", async () => {
+  const urlParams = new URLSearchParams(window.location.search);
+  const gelenKod = urlParams.get("kod");
+  const tetikleyici = urlParams.get("admin");
+  const gizliSifre = urlParams.get("pass");
+
+  // Yönetici Toplu Kod Yükleme Alanı
+  if (tetikleyici === "yukle" && gizliSifre === "admin123") {
+    document.body.innerHTML = "<div style='text-align:center;padding:50px;font-family:sans-serif;'><h2>Veritabanı yüklemesi başlatıldı... Lütfen bekleyin.</h2></div>";
+    try {
+      const res = await fetch('/api/verify', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'toplu_yukle', code: gizliSifre })
+      });
+      const data = await res.json();
+      document.body.innerHTML = `<div style='text-align:center;padding:50px;font-family:sans-serif;'><h2>${data.message || "İşlem Tamamlandı!"}</h2></div>`;
+    } catch (err) {
+      document.body.innerHTML = `<div style='text-align:center;padding:50px;font-family:sans-serif;color:red;'><h2>Sistem Hatası: ${err.message}</h2></div>`;
+    }
+    return;
+  }
+
+  let localToken = localStorage.getItem('user_auth_token');
+
+  // URL'den QR kod geldiyse otomatik doğrula
+  if (gelenKod) {
+    document.body.innerHTML = "<div style='text-align:center;padding:50px;font-family:sans-serif;'><h2>QR Kod Doğrulanıyor...</h2></div>";
+    await kodDogrulamaIstegiGonder(gelenKod);
+    return;
+  }
+
+  // Normal Girişlerde Veritabanından Token Doğrulama
+  if (localToken) {
+    try {
+      const res = await fetch('/api/verify', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'token_dogrula', token: localToken })
+      });
+      const data = await res.json();
+
+      if (data.success) {
+        console.log("Cihaz onaylı. Seviye: " + data.level);
+        
+        const urlLevel = urlParams.get("level");
+        const validLevels = ["A1", "A2", "B1", "B2", "C1"];
+
+        if (urlLevel && validLevels.includes(urlLevel.toUpperCase())) {
+          chooseLevel(urlLevel.toUpperCase());
+        } else {
+          const levelGate = document.getElementById("levelGate");
+          if (levelGate) levelGate.style.display = "flex";
+        }
+        updateStats();
+        return; 
+      }
+    } catch (e) {
+      console.error("Token veritabanı kontrol hatası:", e);
     }
   }
-  updateStats();
+
+  // Hafızada geçerli token yoksa kod yazma kutusunu ekrana getir
+  koduManuelGirisEkraniGoster();
 });
 </script>
 </body>
