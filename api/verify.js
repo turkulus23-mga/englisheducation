@@ -5,9 +5,8 @@ const redis = new Redis({
   token: process.env.REDIS_TOKEN,
 });
 
-// Güvenli ve rastgele 4 haneli kripto string üreten yardımcı fonksiyon
 function generateCryptoSuffix() {
-  const chars = '23456789ABCDEFGHJKLMNPQRSTUVWXYZ'; // Karışıklık olmasın diye 0, 1, O, I hariç
+  const chars = '23456789ABCDEFGHJKLMNPQRSTUVWXYZ';
   let result = '';
   for (let i = 0; i < 4; i++) {
     result += chars.charAt(Math.floor(Math.random() * chars.length));
@@ -16,105 +15,105 @@ function generateCryptoSuffix() {
 }
 
 export default async function handler(req, res) {
-  // CORS ve Method Ayarları
-  if (req.method !== 'POST') {
-    return res.status(405).json({ error: 'Method not allowed' });
+  // GÜNCELLEME: Tarayıcıdan direkt linkle girilebilsin diye GET yöntemine de izin veriyoruz
+  if (req.method !== 'POST' && req.method !== 'GET') {
+    return res.status(405).send('Method not allowed');
   }
 
-  const { action, code, token, admin_pass } = req.body;
-  
-  // GÜVENLİK GÜNCELLEMESİ: Şifre Vercel'deki SECURE_ADMIN_PASSWORD değişkeninden okunur.
+  // İstek POST ise body'den, tarayıcı linkinden (GET) geliyorsa query'den verileri al
+  const action = req.body?.action || req.query?.admin; // ?admin=yukle veya ?admin=indir için
+  const code = req.body?.code || req.query?.kod;
+  const token = req.body?.token || req.query?.token;
+  const admin_pass = req.body?.admin_pass || req.query?.pass; // ?pass=Şifren için
+
   const GERCEK_ADMIN_SIFRESI = process.env.SECURE_ADMIN_PASSWORD; 
 
-  // Eğer Vercel panelinde SECURE_ADMIN_PASSWORD tanımlanmadıysa veya gelen şifre boşsa/eşleşmiyorsa engelle
-  if (!GERCEK_ADMIN_SIFRESI || admin_pass !== GERCEK_ADMIN_SIFRESI) {
-    if (action === 'toplu_yukle' || action === 'kodlari_indir') {
-      return res.status(401).json({ error: 'Yetkisiz erişim! Yönetici şifresi geçersiz.' });
+  // Yönetici doğrulaması gereken işlemler (Yükleme ve İndirme)
+  if (action === 'yukle' || action === 'toplu_yukle' || action === 'indir' || action === 'kodlari_indir') {
+    if (!GERCEK_ADMIN_SIFRESI || admin_pass !== GERCEK_ADMIN_SIFRESI) {
+      // Çökme olmasın diye hatayı düz metin olarak tarayıcıya basıyoruz
+      res.setHeader('Content-Type', 'text/html; charset=utf-8');
+      return res.status(200).send('<h1>❌ HATA: Yönetici şifresi geçersiz veya Vercel ayarı eksik!</h1>');
     }
   }
 
-  // ================= 1. TOPLU YÜKLEME (YENİDEN KOD ÜRETME) =================
-  if (action === 'toplu_yukle') {
+  // ================= 1. TOPLU YÜKLEME =================
+  if (action === 'yukle' || action === 'toplu_yukle') {
     try {
       const levels = ['A1', 'A2', 'B1', 'B2', 'C1'];
-      
-      // Her seviyenin eski listesini temizlemek için del kullanıyoruz
-      for (const level of levels) {
-        await redis.del(`sistem:kodlar:${level}`);
-      }
+      const yeniKodHaritasi = {};
 
-      // Her seviyeyi kendi içinde küçük paketler (pipeline) halinde ekliyoruz ki sunucu şişmesin
       for (const level of levels) {
-        const pipeline = redis.pipeline();
-        
         for (let i = 1; i <= 300; i++) {
           const cryptoPart = generateCryptoSuffix();
           const siraNo = String(i).padStart(3, '0');
           const yeniKriptoKod = `ENG-${level}-${cryptoPart}-${siraNo}`;
-
-          // Öğrenci giriş yaptığında seviyesini doğrulamak için anahtar
-          pipeline.set(`code:${yeniKriptoKod}`, level);
-          
-          // CSV olarak geri indirebilmek için kümeye ekle
-          pipeline.sadd(`sistem:kodlar:${level}`, yeniKriptoKod);
+          yeniKodHaritasi[yeniKriptoKod] = level;
         }
-        
-        // Seviye bittiğinde Redis'e yaz
-        await pipeline.exec();
       }
 
-      return res.status(200).json({ success: true, message: '1500 adet TAHMİN EDİLEMEZ KRİPTO KOD başarıyla veritabanına yüklendi!' });
+      // Tek hamlede yazar, sunucu asla kilitlenmez
+      await redis.set('sistem:aktif_kodlar_sozlugu', JSON.stringify(yeniKodHaritasi));
+
+      res.setHeader('Content-Type', 'text/html; charset=utf-8');
+      return res.status(200).send('<h1>✅ BAŞARILI: 1500 adet yeni kripto kod sunucu kilitlenmeden başarıyla yüklendi!</h1>');
     } catch (err) {
-      return res.status(500).json({ error: 'Veritabanı hatası: ' + err.message });
+      res.setHeader('Content-Type', 'text/html; charset=utf-8');
+      return res.status(200).send('<h1>❌ Veritabanı yazma hatası: ' + err.message + '</h1>');
     }
   }
 
   // ================= 2. KODLARI CSV OLARAK İNDİRME =================
-  if (action === 'kodlari_indir') {
+  if (action === 'indir' || action === 'kodlari_indir') {
     try {
-      const levels = ['A1', 'A2', 'B1', 'B2', 'C1'];
+      const hamVeri = await redis.get('sistem:aktif_kodlar_sozlugu');
+      if (!hamVeri) {
+        res.setHeader('Content-Type', 'text/html; charset=utf-8');
+        return res.status(200).send('<h1>❌ HATA: Sistemde üretilmiş kod bulunamadı. Önce yukle işlemini yapın.</h1>');
+      }
+
+      const harita = typeof hamVeri === 'string' ? JSON.parse(hamVeri) : hamVeri;
       let csvContent = '\uFEFFSeviye,Aktivasyon Kodu,QR Linki\n';
       const host = req.headers['x-forwarded-proto'] + '://' + req.headers.host;
 
-      for (const level of levels) {
-        const kodlar = await redis.smembers(`sistem:kodlar:${level}`);
-        if (kodlar && kodlar.length > 0) {
-          // Çıktının sıralı ve şık görünmesi için sıralıyoruz
-          kodlar.sort((a, b) => a.localeCompare(b));
-          
-          kodlar.forEach(kod => {
-            csvContent += `${level},${kod},${host}/?kod=${kod}\n`;
-          });
-        }
-      }
+      const sıralıKodlar = Object.keys(harita).sort((a, b) => a.localeCompare(b));
+
+      sıralıKodlar.forEach(kod => {
+        const level = harita[kod];
+        csvContent += `${level},${kod},${host}/?kod=${kod}\n`;
+      });
 
       res.setHeader('Content-Type', 'text/csv; charset=utf-8');
       res.setHeader('Content-Disposition', 'attachment; filename=ingilizce_defteri_kripto_kodlar.csv');
       return res.status(200).send(csvContent);
     } catch (err) {
-      return res.status(500).json({ error: 'CSV oluşturma hatası: ' + err.message });
+      res.setHeader('Content-Type', 'text/html; charset=utf-8');
+      return res.status(200).send('<h1>❌ CSV oluşturma hatası: ' + err.message + '</h1>');
     }
   }
 
-  // ================= 3. KOD KONTROLÜ (ÖĞRENCİ GİRİŞİ) =================
+  // ================= 3. KOD KONTROLÜ (ÖĞRENCİ GİRİŞİ - MOBİL/WEB POST) =================
   if (action === 'kontrol_et') {
     if (!code) return res.status(400).json({ error: 'Kod eksik' });
     
     const temizKod = code.trim().toUpperCase();
-    const onaylananSeviye = await redis.get(`code:${temizKod}`);
+    const hamVeri = await redis.get('sistem:aktif_kodlar_sozlugu');
+    
+    if (!hamVeri) return res.status(400).json({ error: 'Sistemde lisans kodu tanımlı değil!' });
+    const harita = typeof hamVeri === 'string' ? JSON.parse(hamVeri) : hamVeri;
+
+    const onaylananSeviye = harita[temizKod];
 
     if (onaylananSeviye) {
       const rastgeleToken = 'TOKEN_' + Math.random().toString(36).substring(2) + Date.now().toString(36);
-      // Öğrenci cihazında 1 yıl boyunca geçerli olacak oturum tokenı
       await redis.set(`token:${rastgeleToken}`, onaylananSeviye, { ex: 60 * 60 * 24 * 365 });
-      
       return res.status(200).json({ success: true, token: rastgeleToken, level: onaylananSeviye });
     } else {
-      return res.status(400).json({ error: 'Geçersiz veya kullanılmış aktivasyon kodu!' });
+      return res.status(400).json({ error: 'Geçersiz aktivasyon kodu!' });
     }
   }
 
-  // ================= 4. CİHAZ TOKEN DOĞRULAMA =================
+  // ================= 4. TOKEN DOĞRULAMA =================
   if (action === 'token_dogrula') {
     if (!token) return res.status(400).json({ error: 'Token eksik' });
     
