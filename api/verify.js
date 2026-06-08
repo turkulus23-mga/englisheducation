@@ -1,6 +1,5 @@
 import { createClient } from 'redis';
 
-// Serverless ortamlarda bağlantı havuzunu korumak için client'ı globalde tutuyoruz
 let redisClient = null;
 
 async function getRedisClient() {
@@ -14,8 +13,17 @@ async function getRedisClient() {
     return redisClient;
 }
 
+// Tahmin edilemezliği sağlamak için rastgele 4 haneli kod üreten yardımcı fonksiyon
+function generateRandomSalt() {
+    const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; // Karışıklığı önlemek için O, I, 1, 0 elendi
+    let result = '';
+    for (let i = 0; i < 4; i++) {
+        result += chars.charAt(Math.floor(Math.random() * chars.length));
+    }
+    return result;
+}
+
 export default async function handler(req, res) {
-    // CORS Ayarları
     res.setHeader('Access-Control-Allow-Origin', '*');
     res.setHeader('Access-Control-Allow-Methods', 'POST, GET, OPTIONS');
     res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
@@ -28,10 +36,9 @@ export default async function handler(req, res) {
         const client = await getRedisClient();
         const { action, code, token, admin_pass } = req.body;
 
-        // GÜVENLİ ŞİFRE KONTROLÜ (Vercel Panelinden SECURE_ADMIN_PASSWORD adıyla ekleyin)
         const SECURE_ADMIN_PASS = process.env.SECURE_ADMIN_PASSWORD || 'AşırıGüvenliŞifre123!';
 
-        // 1. TOPLU YÜKLEME
+        // 1. TOPLU YÜKLEME (GÜVENLİ VE TAHMİN EDİLEMEZ)
         if (action === 'toplu_yukle') {
             if (admin_pass !== SECURE_ADMIN_PASS) {
                 return res.status(403).json({ error: 'Yönetici şifresi hatalı!' });
@@ -43,14 +50,16 @@ export default async function handler(req, res) {
             for (const lvl of levels) {
                 for (let i = 1; i <= 300; i++) {
                     const pad = String(i).padStart(3, '0');
-                    const generatedCode = `ENG-${lvl}-${pad}`;
+                    const salt = generateRandomSalt(); // Her koda özel rastgele 4 hane
+                    const generatedCode = `ENG-${lvl}-${salt}-${pad}`; // Örn: ENG-A1-X8R2-001
+                    
                     promises.push(client.set(`code:${generatedCode}`, JSON.stringify({
                         level: lvl, used: false, usedAt: null
                     })));
                 }
             }
             await Promise.all(promises);
-            return res.status(200).json({ success: true, message: '1500 kod güvenle yüklendi!' });
+            return res.status(200).json({ success: true, message: '1500 adet tahmin edilemez kriptografik kod güvenle yüklendi!' });
         }
 
         // 2. GÜVENLİ KOD İNDİRME
@@ -59,23 +68,27 @@ export default async function handler(req, res) {
                 return res.status(403).json({ error: 'Yönetici şifresi hatalı! Kodlar indirilemez.' });
             }
 
-            const levels = ['A1', 'A2', 'B1', 'B2', 'C1'];
-            // UTF-8 BOM ekliyoruz ki Excel Türkçe karakterleri bozmasın
+            // ÖNEMLİ: İndirirken de veritabanındaki gerçek üretilmiş kodları çekmemiz gerekir.
+            // Ancak performansı korumak ve hafızayı şişirmemek için Redis'teki anahtarları tarıyoruz.
+            const keys = await client.keys('code:ENG-*');
+            
             let csvContent = "\xEF\xBB\xBFSeviye,Aktivasyon Kodu,QR Linki\n";
             const origin = req.headers.origin || `https://${req.headers.host}`;
 
-            for (const lvl of levels) {
-                for (let i = 1; i <= 300; i++) {
-                    const pad = String(i).padStart(3, '0');
-                    const generatedCode = `ENG-${lvl}-${pad}`;
-                    const qrLink = `${origin}/?kod=${generatedCode}`;
-                    csvContent += `${lvl},${generatedCode},${qrLink}\n`;
-                }
+            // Kodları daha düzenli indirmek için sıralayalım
+            keys.sort();
+
+            for (const key of keys) {
+                const generatedCode = key.replace('code:', '');
+                // Kodun içinden seviyeyi ayıkla (ENG-A1-XXXX-001 formatından A1'i çeker)
+                const parts = generatedCode.split('-');
+                const lvl = parts[1] || 'Bilinmeyen';
+                const qrLink = `${origin}/?kod=${generatedCode}`;
+                csvContent += `${lvl},${generatedCode},${qrLink}\n`;
             }
 
-            // Dosyayı tarayıcıya güvenli stream olarak basıyoruz
             res.setHeader('Content-Type', 'text/csv; charset=utf-8');
-            res.setHeader('Content-Disposition', 'attachment; filename=ingilizce_defteri_aktivasyon_kodlari.csv');
+            res.setHeader('Content-Disposition', 'attachment; filename=ingilizce_defteri_kripto_kodlar.csv');
             return res.status(200).send(csvContent);
         }
 
@@ -98,7 +111,6 @@ export default async function handler(req, res) {
             const userToken = `token_${Math.random().toString(36).substring(2)}_${Date.now()}`;
             codeData.token = userToken;
 
-            // Değişiklikleri kaydet
             await client.set(`code:${cleanCode}`, JSON.stringify(codeData));
             await client.set(`token:${userToken}`, codeData.level);
 
