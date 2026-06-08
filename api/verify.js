@@ -5,9 +5,8 @@ const redis = new Redis({
   token: process.env.REDIS_TOKEN,
 });
 
-// Güvenli ve rastgele 4 haneli kripto string üreten yardımcı fonksiyon
 function generateCryptoSuffix() {
-  const chars = '23456789ABCDEFGHJKLMNPQRSTUVWXYZ'; // Karışıklık olmasın diye 0, 1, O, I hariç
+  const chars = '23456789ABCDEFGHJKLMNPQRSTUVWXYZ';
   let result = '';
   for (let i = 0; i < 4; i++) {
     result += chars.charAt(Math.floor(Math.random() * chars.length));
@@ -23,44 +22,36 @@ export default async function handler(req, res) {
   const { action, code, token, admin_pass } = req.body;
   const GERCEK_ADMIN_SIFRESI = process.env.ADMIN_PASS || "MGA_Teacher_2026"; 
 
-  // ================= 1. TOPLU YÜKLEME (YENİDEN KOD ÜRETME) =================
+  // ================= 1. TOPLU YÜKLEME =================
   if (action === 'toplu_yukle') {
     if (admin_pass !== GERCEK_ADMIN_SIFRESI) {
       return res.status(401).json({ error: 'Yetkisiz erişim!' });
     }
 
     try {
-      const levels = ['A1', 'A2', 'B1', 'B2', 'C1'];
-      const pipeline = redis.pipeline();
-      
-      // Güvenlik için önce tüm eski verileri temizliyoruz
+      // Önce veritabanını temizleyelim
       await redis.flushdb();
 
-      // Toplam kodları takip etmek için bir liste tutacağız
-      const tumKodlar = [];
-
+      const levels = ['A1', 'A2', 'B1', 'B2', 'C1'];
+      
+      // Vercel'in 10 saniye limitine takılmamak ve Redis'i yormamak için 
+      // her seviyeyi ayrı ayrı küçük pipeline'lar halinde gönderiyoruz
       for (const level of levels) {
+        const pipeline = redis.pipeline();
         for (let i = 1; i <= 300; i++) {
-          // Örn: ENG-A1-X7B9-001 (Kesinlikle ardışık değil, her seviye için benzersiz)
           const cryptoPart = generateCryptoSuffix();
           const siraNo = String(i).padStart(3, '0');
           const yeniKriptoKod = `ENG-${level}-${cryptoPart}-${siraNo}`;
 
-          // Redis'e kaydet (Değer olarak sadece seviyesini yazıyoruz: "A1")
+          // Ana doğrulamayı sakla
           pipeline.set(`code:${yeniKriptoKod}`, level);
-          
-          // Listeye ekle (İndirme işleminde kolaylık olsun diye)
-          tumKodlar.push({ kod: yeniKriptoKod, level: level });
+          // CSV indirme motoru için kodu listeye ekle
+          pipeline.sadd(`sistem:kodlar:${level}`, yeniKriptoKod);
         }
+        await pipeline.exec(); // Her seviye bittiğinde Redis'e yaz ve rahatlat
       }
 
-      // Üretilen tüm kod listesini tek seferde bir anahtara gömüyoruz (İndirirken bozulmasın diye)
-      pipeline.set('sistem:tum_kod_listesi', JSON.stringify(tumKodlar));
-      
-      // Tüm işlemleri tek seferde Redis'e gönder
-      await pipeline.exec();
-
-      return res.status(200).json({ success: true, message: '1500 adet TAHMİN EDİLEMEZ YENİ KRİPTO KOD başarıyla veritabanına yüklendi!' });
+      return res.status(200).json({ success: true, message: '1500 adet kriptografik kod sunucuyu yormadan güvenle yüklendi!' });
     } catch (err) {
       return res.status(500).json({ error: 'Veritabanı hatası: ' + err.message });
     }
@@ -73,31 +64,31 @@ export default async function handler(req, res) {
     }
 
     try {
-      const hamVeri = await redis.get('sistem:tum_kod_listesi');
-      if (!hamVeri) {
-        return res.status(404).json({ error: 'Sistemde üretilmiş kod bulunamadı. Önce yukle işlemini yapın.' });
-      }
-
-      const kodlar = typeof hamVeri === 'string' ? JSON.parse(hamVeri) : hamVeri;
-      
-      // UTF-8 BOM ekleyerek Excel'de Türkçe karakterlerin bozulmasını önlüyoruz
+      const levels = ['A1', 'A2', 'B1', 'B2', 'C1'];
       let csvContent = '\uFEFFSeviye,Aktivasyon Kodu,QR Linki\n';
-      
       const host = req.headers['x-forwarded-proto'] + '://' + req.headers.host;
 
-      kodlar.forEach(item => {
-        csvContent += `${item.level},${item.kod},${host}/?kod=${item.kod}\n`;
-      });
+      // Her seviyedeki kodları sırayla çekip CSV'ye ekliyoruz
+      for (const level of levels) {
+        const kodlar = await redis.smembers(`sistem:kodlar:${level}`);
+        if (kodlar && kodlar.length > 0) {
+          // Kodların sonundaki sıra numarasına göre sıralı görünmesi için küçük bir sort
+          kodlar.sort((a, b) => a.localeCompare(b));
+          kodlar.forEach(kod => {
+            csvContent += `${level},${kod},${host}/?kod=${kod}\n`;
+          });
+        }
+      }
 
       res.setHeader('Content-Type', 'text/csv; charset=utf-8');
-      res.setHeader('Content-Disposition', 'attachment; filename=ingilizce_defteri_yeni_kripto_kodlar.csv');
+      res.setHeader('Content-Disposition', 'attachment; filename=ingilizce_defteri_kripto_kodlar.csv');
       return res.status(200).send(csvContent);
     } catch (err) {
       return res.status(500).json({ error: 'CSV oluşturma hatası: ' + err.message });
     }
   }
 
-  // ================= 3. KOD KONTROLÜ (ÖĞRENCİ GİRİŞİ) =================
+  // ================= 3. KOD KONTROLÜ =================
   if (action === 'kontrol_et') {
     if (!code) return res.status(400).json({ error: 'Kod eksik' });
     
@@ -105,17 +96,15 @@ export default async function handler(req, res) {
     const onaylananSeviye = await redis.get(`code:${temizKod}`);
 
     if (onaylananSeviye) {
-      // Güvenli bir token üretip tarayıcıya veriyoruz
       const rastgeleToken = 'TOKEN_' + Math.random().toString(36).substring(2) + Date.now().toString(36);
-      await redis.set(`token:${rastgeleToken}`, onaylananSeviye, { ex: 60 * 60 * 24 * 365 }); // 1 Yıl Geçerli
-      
+      await redis.set(`token:${rastgeleToken}`, onaylananSeviye, { ex: 60 * 60 * 24 * 365 });
       return res.status(200).json({ success: true, token: rastgeleToken, level: onaylananSeviye });
     } else {
       return res.status(400).json({ error: 'Geçersiz veya kullanılmış aktivasyon kodu!' });
     }
   }
 
-  // ================= 4. CİHAZ TOKEN DOĞRULAMA =================
+  // ================= 4. TOKEN DOĞRULAMA =================
   if (action === 'token_dogrula') {
     if (!token) return res.status(400).json({ error: 'Token eksik' });
     
@@ -129,4 +118,3 @@ export default async function handler(req, res) {
 
   return res.status(400).json({ error: 'Geçersiz işlem' });
 }
-
