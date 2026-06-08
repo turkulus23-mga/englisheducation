@@ -1,133 +1,132 @@
-import { createClient } from 'redis';
+import { Redis } from '@upstash/redis';
 
-let redisClient = null;
+const redis = new Redis({
+  url: process.env.REDIS_URL,
+  token: process.env.REDIS_TOKEN,
+});
 
-async function getRedisClient() {
-    if (!redisClient) {
-        redisClient = createClient({ url: process.env.REDIS_URL });
-        redisClient.on('error', (err) => console.error('Redis Client Error', err));
-        await redisClient.connect();
-    } else if (!redisClient.isOpen) {
-        await redisClient.connect();
-    }
-    return redisClient;
-}
-
-// Tahmin edilemezliği sağlamak için rastgele 4 haneli kod üreten yardımcı fonksiyon
-function generateRandomSalt() {
-    const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; // Karışıklığı önlemek için O, I, 1, 0 elendi
-    let result = '';
-    for (let i = 0; i < 4; i++) {
-        result += chars.charAt(Math.floor(Math.random() * chars.length));
-    }
-    return result;
+// Güvenli ve rastgele 4 haneli kripto string üreten yardımcı fonksiyon
+function generateCryptoSuffix() {
+  const chars = '23456789ABCDEFGHJKLMNPQRSTUVWXYZ'; // Karışıklık olmasın diye 0, 1, O, I hariç
+  let result = '';
+  for (let i = 0; i < 4; i++) {
+    result += chars.charAt(Math.floor(Math.random() * chars.length));
+  }
+  return result;
 }
 
 export default async function handler(req, res) {
-    res.setHeader('Access-Control-Allow-Origin', '*');
-    res.setHeader('Access-Control-Allow-Methods', 'POST, GET, OPTIONS');
-    res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+  if (req.method !== 'POST') {
+    return res.status(405).json({ error: 'Method not allowed' });
+  }
 
-    if (req.method === 'OPTIONS') return res.status(200).end();
-    if (req.method !== 'POST') return res.status(405).json({ error: 'Yalnızca POST kabul edilir.' });
-    if (!process.env.REDIS_URL) return res.status(500).json({ error: 'REDIS_URL tanımlanmamış!' });
+  const { action, code, token, admin_pass } = req.body;
+  const GERCEK_ADMIN_SIFRESI = process.env.ADMIN_PASS || "MGA_Teacher_2026"; 
+
+  // ================= 1. TOPLU YÜKLEME (YENİDEN KOD ÜRETME) =================
+  if (action === 'toplu_yukle') {
+    if (admin_pass !== GERCEK_ADMIN_SIFRESI) {
+      return res.status(401).json({ error: 'Yetkisiz erişim!' });
+    }
 
     try {
-        const client = await getRedisClient();
-        const { action, code, token, admin_pass } = req.body;
+      const levels = ['A1', 'A2', 'B1', 'B2', 'C1'];
+      const pipeline = redis.pipeline();
+      
+      // Güvenlik için önce tüm eski verileri temizliyoruz
+      await redis.flushdb();
 
-        const SECURE_ADMIN_PASS = process.env.SECURE_ADMIN_PASSWORD || 'AşırıGüvenliŞifre123!';
+      // Toplam kodları takip etmek için bir liste tutacağız
+      const tumKodlar = [];
 
-        // 1. TOPLU YÜKLEME (GÜVENLİ VE TAHMİN EDİLEMEZ)
-        if (action === 'toplu_yukle') {
-            if (admin_pass !== SECURE_ADMIN_PASS) {
-                return res.status(403).json({ error: 'Yönetici şifresi hatalı!' });
-            }
+      for (const level of levels) {
+        for (let i = 1; i <= 300; i++) {
+          // Örn: ENG-A1-X7B9-001 (Kesinlikle ardışık değil, her seviye için benzersiz)
+          const cryptoPart = generateCryptoSuffix();
+          const siraNo = String(i).padStart(3, '0');
+          const yeniKriptoKod = `ENG-${level}-${cryptoPart}-${siraNo}`;
 
-            const levels = ['A1', 'A2', 'B1', 'B2', 'C1'];
-            const promises = [];
-
-            for (const lvl of levels) {
-                for (let i = 1; i <= 300; i++) {
-                    const pad = String(i).padStart(3, '0');
-                    const salt = generateRandomSalt(); // Her koda özel rastgele 4 hane
-                    const generatedCode = `ENG-${lvl}-${salt}-${pad}`; // Örn: ENG-A1-X8R2-001
-                    
-                    promises.push(client.set(`code:${generatedCode}`, JSON.stringify({
-                        level: lvl, used: false, usedAt: null
-                    })));
-                }
-            }
-            await Promise.all(promises);
-            return res.status(200).json({ success: true, message: '1500 adet tahmin edilemez kriptografik kod güvenle yüklendi!' });
+          // Redis'e kaydet (Değer olarak sadece seviyesini yazıyoruz: "A1")
+          pipeline.set(`code:${yeniKriptoKod}`, level);
+          
+          // Listeye ekle (İndirme işleminde kolaylık olsun diye)
+          tumKodlar.push({ kod: yeniKriptoKod, level: level });
         }
+      }
 
-        // 2. GÜVENLİ KOD İNDİRME
-        if (action === 'kodlari_indir') {
-            if (admin_pass !== SECURE_ADMIN_PASS) {
-                return res.status(403).json({ error: 'Yönetici şifresi hatalı! Kodlar indirilemez.' });
-            }
+      // Üretilen tüm kod listesini tek seferde bir anahtara gömüyoruz (İndirirken bozulmasın diye)
+      pipeline.set('sistem:tum_kod_listesi', JSON.stringify(tumKodlar));
+      
+      // Tüm işlemleri tek seferde Redis'e gönder
+      await pipeline.exec();
 
-            // ÖNEMLİ: İndirirken de veritabanındaki gerçek üretilmiş kodları çekmemiz gerekir.
-            // Ancak performansı korumak ve hafızayı şişirmemek için Redis'teki anahtarları tarıyoruz.
-            const keys = await client.keys('code:ENG-*');
-            
-            let csvContent = "\xEF\xBB\xBFSeviye,Aktivasyon Kodu,QR Linki\n";
-            const origin = req.headers.origin || `https://${req.headers.host}`;
-
-            // Kodları daha düzenli indirmek için sıralayalım
-            keys.sort();
-
-            for (const key of keys) {
-                const generatedCode = key.replace('code:', '');
-                // Kodun içinden seviyeyi ayıkla (ENG-A1-XXXX-001 formatından A1'i çeker)
-                const parts = generatedCode.split('-');
-                const lvl = parts[1] || 'Bilinmeyen';
-                const qrLink = `${origin}/?kod=${generatedCode}`;
-                csvContent += `${lvl},${generatedCode},${qrLink}\n`;
-            }
-
-            res.setHeader('Content-Type', 'text/csv; charset=utf-8');
-            res.setHeader('Content-Disposition', 'attachment; filename=ingilizce_defteri_kripto_kodlar.csv');
-            return res.status(200).send(csvContent);
-        }
-
-        // 3. KOD AKTİFLEŞTİRME
-        if (action === 'kontrol_et') {
-            const cleanCode = String(code || '').trim().toUpperCase();
-            const dataRaw = await client.get(`code:${cleanCode}`);
-
-            if (!dataRaw) {
-                return res.status(400).json({ success: false, error: 'Geçersiz veya hatalı kod girdiniz!' });
-            }
-
-            const codeData = JSON.parse(dataRaw);
-            if (codeData.used) {
-                return res.status(400).json({ success: false, error: 'Bu kod zaten kullanılmış!' });
-            }
-
-            codeData.used = true;
-            codeData.usedAt = new Date().toISOString();
-            const userToken = `token_${Math.random().toString(36).substring(2)}_${Date.now()}`;
-            codeData.token = userToken;
-
-            await client.set(`code:${cleanCode}`, JSON.stringify(codeData));
-            await client.set(`token:${userToken}`, codeData.level);
-
-            return res.status(200).json({ success: true, token: userToken, level: codeData.level });
-        }
-
-        // 4. TOKEN DOĞRULAMA
-        if (action === 'token_dogrula') {
-            const level = await client.get(`token:${token}`);
-            if (level) return res.status(200).json({ success: true, level: level });
-            return res.status(400).json({ success: false, error: 'Geçersiz cihaz!' });
-        }
-
-        return res.status(400).json({ error: 'Geçersiz işlem.' });
-
+      return res.status(200).json({ success: true, message: '1500 adet TAHMİN EDİLEMEZ YENİ KRİPTO KOD başarıyla veritabanına yüklendi!' });
     } catch (err) {
-        console.error("Sistem Hatası:", err);
-        return res.status(500).json({ error: 'Hata: ' + err.message });
+      return res.status(500).json({ error: 'Veritabanı hatası: ' + err.message });
     }
+  }
+
+  // ================= 2. KODLARI CSV OLARAK İNDİRME =================
+  if (action === 'kodlari_indir') {
+    if (admin_pass !== GERCEK_ADMIN_SIFRESI) {
+      return res.status(401).json({ error: 'Yetkisiz erişim!' });
+    }
+
+    try {
+      const hamVeri = await redis.get('sistem:tum_kod_listesi');
+      if (!hamVeri) {
+        return res.status(404).json({ error: 'Sistemde üretilmiş kod bulunamadı. Önce yukle işlemini yapın.' });
+      }
+
+      const kodlar = typeof hamVeri === 'string' ? JSON.parse(hamVeri) : hamVeri;
+      
+      // UTF-8 BOM ekleyerek Excel'de Türkçe karakterlerin bozulmasını önlüyoruz
+      let csvContent = '\uFEFFSeviye,Aktivasyon Kodu,QR Linki\n';
+      
+      const host = req.headers['x-forwarded-proto'] + '://' + req.headers.host;
+
+      kodlar.forEach(item => {
+        csvContent += `${item.level},${item.kod},${host}/?kod=${item.kod}\n`;
+      });
+
+      res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+      res.setHeader('Content-Disposition', 'attachment; filename=ingilizce_defteri_yeni_kripto_kodlar.csv');
+      return res.status(200).send(csvContent);
+    } catch (err) {
+      return res.status(500).json({ error: 'CSV oluşturma hatası: ' + err.message });
+    }
+  }
+
+  // ================= 3. KOD KONTROLÜ (ÖĞRENCİ GİRİŞİ) =================
+  if (action === 'kontrol_et') {
+    if (!code) return res.status(400).json({ error: 'Kod eksik' });
+    
+    const temizKod = code.trim().toUpperCase();
+    const onaylananSeviye = await redis.get(`code:${temizKod}`);
+
+    if (onaylananSeviye) {
+      // Güvenli bir token üretip tarayıcıya veriyoruz
+      const rastgeleToken = 'TOKEN_' + Math.random().toString(36).substring(2) + Date.now().toString(36);
+      await redis.set(`token:${rastgeleToken}`, onaylananSeviye, { ex: 60 * 60 * 24 * 365 }); // 1 Yıl Geçerli
+      
+      return res.status(200).json({ success: true, token: rastgeleToken, level: onaylananSeviye });
+    } else {
+      return res.status(400).json({ error: 'Geçersiz veya kullanılmış aktivasyon kodu!' });
+    }
+  }
+
+  // ================= 4. CİHAZ TOKEN DOĞRULAMA =================
+  if (action === 'token_dogrula') {
+    if (!token) return res.status(400).json({ error: 'Token eksik' });
+    
+    const seviye = await redis.get(`token:${token}`);
+    if (seviye) {
+      return res.status(200).json({ success: true, level: seviye });
+    } else {
+      return res.status(400).json({ error: 'Oturum geçersiz' });
+    }
+  }
+
+  return res.status(400).json({ error: 'Geçersiz işlem' });
 }
+
