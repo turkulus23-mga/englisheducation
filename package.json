@@ -1,0 +1,13 @@
+{
+  "name": "ai-teacher-hardcore",
+  "version": "1.0.0",
+  "description": "AI Teacher Aktivasyon ve Oyun Sistemi",
+  "main": "index.html",
+  "dependencies": {
+    "redis": "^4.7.0"
+  },
+  "engines": {
+    "node": "18.x"
+  }
+}
+
