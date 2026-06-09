@@ -45,10 +45,11 @@ export default async function handler(req, res) {
     const allCodes = getActivationCodes();
     const redis = await getRedis();
 
-    // ================= ÖĞRENCİ GİRİŞ KONTROLÜ (🔒 TEK SEFERLİK) =================
+    // ================= ÖĞRENCİ GİRİŞ KONTROLÜ (🔒 AKILLI TEK SEFERLİK & PARMAK İZİ KORUMALI) =================
     if (action === 'kontrol_et') {
       if (!code) return res.status(400).json({ error: 'Kod eksik' });
       const temizKod = code.trim().toUpperCase();
+      const deviceId = req.body?.deviceId || "UNKNOWN_DEV"; // Ön yüzden gelen parmak izi
 
       // Kontrol 1: Kod Vercel Env listesinde tanımlı bir kod mu?
       const onaylananSeviye = allCodes[temizKod];
@@ -56,14 +57,16 @@ export default async function handler(req, res) {
         return res.status(400).json({ error: 'Geçersiz aktivasyon kodu!' });
       }
 
-      // Kontrol 2: Bu kod daha önce veritabanında kullanıldı olarak işaretlenmiş mi?
-      const isUsed = await redis.get(`used:${temizKod}`);
-      if (isUsed) {
+      // Kontrol 2: Bu kod daha önce kullanılmış mı?
+      const existingDevice = await redis.get(`used:${temizKod}`);
+      
+      // EĞER KOD DAHA ÖNCE KULLANILMIŞSA AMA AYNI CİHAZ TEKRAR GİRİYORSA (Geçmişi silmişse):
+      if (existingDevice && existingDevice !== deviceId) {
         return res.status(400).json({ error: 'Bu aktivasyon kodu daha önce başka bir cihazda kullanılmış!' });
       }
 
-      // 🔒 KODU ÖMÜR BOYU İMHA ETME: Kodu Redis'e "kullanıldı" olarak kalıcı kaydediyoruz
-      await redis.set(`used:${temizKod}`, 'true');
+      // 🔒 KODU O CİHAZA KİLİTLEME: true yazmak yerine cihazın eşsiz ID'sini yazıyoruz
+      await redis.set(`used:${temizKod}`, deviceId);
 
       // Öğrenci cihazına uygulamada kalması için 1 yıl geçerli bir token veriyoruz
       const rastgeleToken = 'TOKEN_' + Math.random().toString(36).substring(2) + Date.now().toString(36);
