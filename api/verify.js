@@ -1,6 +1,5 @@
 import { createClient } from 'redis';
 
-// Vercel'in kendi Redis bağlantısını başlatıyoruz
 let redisClient = null;
 async function getRedis() {
   if (!redisClient) {
@@ -28,21 +27,11 @@ export default async function handler(req, res) {
     const action = req.body?.action || req.query?.admin; 
     const code = req.body?.code || req.query?.kod;
     const token = req.body?.token || req.query?.token;
-    const admin_pass = req.body?.admin_pass || req.query?.pass; 
     const targetLevel = (req.body?.level || req.query?.seviye || '').toUpperCase();
 
-    const GERCEK_ADMIN_SIFRESI = process.env.SECURE_ADMIN_PASSWORD;
     const redis = await getRedis();
 
-    // Yönetici Doğrulaması
-    if (action === 'yukle' || action === 'toplu_yukle' || action === 'indir' || action === 'kodlari_indir') {
-      if (!GERCEK_ADMIN_SIFRESI || admin_pass !== GERCEK_ADMIN_SIFRESI) {
-        res.setHeader('Content-Type', 'text/html; charset=utf-8');
-        return res.status(200).send('<h1>❌ HATA: Yönetici şifresi geçersiz!</h1>');
-      }
-    }
-
-    // ================= 1. PARÇA PARÇA YÜKLEME =================
+    // ================= 1. PARÇA PARÇA YÜKLEME (ŞİFRESİZ) =================
     if (action === 'yukle' || action === 'toplu_yukle') {
       const validLevels = ['A1', 'A2', 'B1', 'B2', 'C1'];
       if (!validLevels.includes(targetLevel)) {
@@ -50,10 +39,8 @@ export default async function handler(req, res) {
         return res.status(200).send('<h1>❌ HATA: Lütfen geçerli bir seviye belirtin! (A1, A2, B1, B2, C1)</h1>');
       }
 
-      // Eski listeyi temizle
       await redis.del(`sistem:kodlar:${targetLevel}`);
 
-      // Vercel Redis uyumlu toplu yazma (Multi)
       const multi = redis.multi();
       for (let i = 1; i <= 300; i++) {
         const cryptoPart = generateCryptoSuffix();
@@ -69,7 +56,7 @@ export default async function handler(req, res) {
       return res.status(200).send(`<h1>✅ BAŞARILI: ${targetLevel} seviyesi için 300 adet yeni kripto kod başarıyla yüklendi!</h1>`);
     }
 
-    // ================= 2. PARÇA PARÇA CSV İNDİRME =================
+    // ================= 2. PARÇA PARÇA CSV İNDİRME (ŞİFRESİZ) =================
     if (action === 'indir' || action === 'kodlari_indir') {
       if (!targetLevel) {
         res.setHeader('Content-Type', 'text/html; charset=utf-8');
@@ -106,7 +93,6 @@ export default async function handler(req, res) {
 
       if (onaylananSeviye) {
         const rastgeleToken = 'TOKEN_' + Math.random().toString(36).substring(2) + Date.now().toString(36);
-        // 1 yıl geçerli oturum
         await redis.set(`token:${rastgeleToken}`, onaylananSeviye, { EX: 60 * 60 * 24 * 365 });
         return res.status(200).json({ success: true, token: rastgeleToken, level: onaylananSeviye });
       } else {
