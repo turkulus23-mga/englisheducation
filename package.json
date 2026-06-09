@@ -7,6 +7,6 @@
     "redis": "^4.7.0"
   },
   "engines": {
-    "node": "24.x"
+    "node": "22.x"
   }
 }
