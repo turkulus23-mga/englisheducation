@@ -31,12 +31,12 @@ export default async function handler(req, res) {
 
     const redis = await getRedis();
 
-    // ================= 1. PARÇA PARÇA YÜKLEME (ŞİFRESİZ) =================
+    // ================= 1. PARÇA PARÇA YÜKLEME =================
     if (action === 'yukle' || action === 'toplu_yukle') {
       const validLevels = ['A1', 'A2', 'B1', 'B2', 'C1'];
       if (!validLevels.includes(targetLevel)) {
         res.setHeader('Content-Type', 'text/html; charset=utf-8');
-        return res.status(200).send('<h1>❌ HATA: Lütfen geçerli bir seviye belirtin! (A1, A2, B1, B2, C1)</h1>');
+        return res.status(200).send('<h1>❌ HATA: Lutfen gecerli bir seviye belirtin! (A1, A2, B1, B2, C1)</h1>');
       }
 
       await redis.del(`sistem:kodlar:${targetLevel}`);
@@ -53,24 +53,25 @@ export default async function handler(req, res) {
       await multi.exec();
 
       res.setHeader('Content-Type', 'text/html; charset=utf-8');
-      return res.status(200).send(`<h1>✅ BAŞARILI: ${targetLevel} seviyesi için 300 adet yeni kripto kod başarıyla yüklendi!</h1>`);
+      return res.status(200).send(`<h1>✅ BASARILI: ${targetLevel} seviyesi icin 300 adet yeni kripto kod yuklendi!</h1>`);
     }
 
-    // ================= 2. PARÇA PARÇA CSV İNDİRME (ŞİFRESİZ) =================
+    // ================= 2. PARÇA PARÇA CSV İNDİRME =================
     if (action === 'indir' || action === 'kodlari_indir') {
       if (!targetLevel) {
         res.setHeader('Content-Type', 'text/html; charset=utf-8');
-        return res.status(200).send('<h1>❌ HATA: Hangi seviyeyi indireceğinizi belirtmediniz!</h1>');
+        return res.status(200).send('<h1>❌ HATA: Hangi seviyeyi indireceginizi belirtmediniz!</h1>');
       }
 
       const kodlar = await redis.sMembers(`sistem:kodlar:${targetLevel}`);
       if (!kodlar || kodlar.length === 0) {
         res.setHeader('Content-Type', 'text/html; charset=utf-8');
-        return res.status(200).send(`<h1>❌ HATA: ${targetLevel} seviyesine ait kod bulunamadı. Önce yükleme yapın!</h1>`);
+        return res.status(200).send(`<h1>❌ HATA: ${targetLevel} seviyesine ait kod bulunamadi. Once yukleme yapin!</h1>`);
       }
 
       kodlar.sort((a, b) => a.localeCompare(b));
 
+      // Excel Türkçe karakterleri doğru görsün diye BOM ekliyoruz
       let csvContent = '\uFEFFSeviye,Aktivasyon Kodu,QR Linki\n';
       const protocol = req.headers['x-forwarded-proto'] || 'https';
       const host = req.headers.host || 'englisheducation-five.vercel.app';
@@ -80,9 +81,16 @@ export default async function handler(req, res) {
         csvContent += `${targetLevel},${kod},${siteUrl}/?kod=${kod}\n`;
       });
 
+      // Tarayıcının ERR_INVALID_RESPONSE vermemesi için içeriği Buffer'a çeviriyoruz
+      const csvBuffer = Buffer.from(csvContent, 'utf-8');
+
+      // Doğru HTTP başlıkları (İngilizce karakterlerle)
       res.setHeader('Content-Type', 'text/csv; charset=utf-8');
-      res.setHeader('Content-Disposition', `attachment; filename=ingilizce_defteri_${targetLevel}_kripto_kodlar.csv`);
-      return res.status(200).send(csvContent);
+      res.setHeader('Content-Disposition', `attachment; filename=ingilizce_defteri_${targetLevel}_kodlar.csv`);
+      res.setHeader('Content-Length', csvBuffer.length);
+      
+      // Yanıtı gönderiyoruz
+      return res.status(200).end(csvBuffer);
     }
 
     // ================= 3. ÖĞRENCİ GİRİŞ KONTROLÜ =================
@@ -96,7 +104,7 @@ export default async function handler(req, res) {
         await redis.set(`token:${rastgeleToken}`, onaylananSeviye, { EX: 60 * 60 * 24 * 365 });
         return res.status(200).json({ success: true, token: rastgeleToken, level: onaylananSeviye });
       } else {
-        return res.status(400).json({ error: 'Geçersiz aktivasyon kodu!' });
+        return res.status(400).json({ error: 'Gecersiz aktivasyon kodu!' });
       }
     }
 
@@ -107,7 +115,7 @@ export default async function handler(req, res) {
       if (seviye) {
         return res.status(200).json({ success: true, level: seviye });
       } else {
-        return res.status(400).json({ error: 'Oturum geçersiz' });
+        return res.status(400).json({ error: 'Oturum gecersiz' });
       }
     }
 
@@ -116,6 +124,6 @@ export default async function handler(req, res) {
 
   } catch (error) {
     res.setHeader('Content-Type', 'text/html; charset=utf-8');
-    return res.status(200).send(`<h1>❌ Sunucu Hatası: ${error.message}</h1>`);
+    return res.status(200).send(`<h1>❌ Sunucu Hatasi: ${error.message}</h1>`);
   }
 }
