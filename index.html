@@ -367,6 +367,7 @@ height:calc(100dvh - 120px);
 }
 
 /* Right full width */
+#right{
 width:100%;flex:1;min-height:0;
 display:flex;flex-direction:column;
 overflow:hidden;
@@ -911,12 +912,29 @@ async function manuelKodOnayla() {
   await kodDogrulamaIstegiGonder(girilenKod);
 }
 
+// Cihazın geçmişi silinse bile değişmeyecek eşsiz kimliğini üretir
+function getDeviceFingerprint() {
+  const navigatorInfo = window.navigator.userAgent + window.navigator.language + window.navigator.hardwareConcurrency;
+  const screenInfo = window.screen.width + "x" + window.screen.height + window.screen.colorDepth;
+  const rawId = navigatorInfo + screenInfo;
+  
+  // Basit bir string hash fonksiyonu (Benzersiz ID üretmek için)
+  let hash = 0;
+  for (let i = 0; i < rawId.length; i++) {
+    const char = rawId.charCodeAt(i);
+    hash = ((hash << 5) - hash) + char;
+    hash = hash & hash;
+  }
+  return "DEV_" + Math.abs(hash).toString(36);
+}
+
 async function kodDogrulamaIstegiGonder(kod) {
   try {
+    const deviceId = getDeviceFingerprint(); // Parmak izini alıyoruz
     const res = await fetch('/api/verify', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'kontrol_et', code: kod })
+        body: JSON.stringify({ action: 'kontrol_et', code: kod, deviceId: deviceId }) // API'ye yolluyoruz
     });
     const data = await res.json();
 
@@ -1023,3 +1041,4 @@ window.addEventListener("DOMContentLoaded", async () => {
 </script>
 </body>
 </html>
+
