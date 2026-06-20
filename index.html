@@ -528,7 +528,13 @@ function chooseLevel(level){
   }
 
   currentLevel = safeLevel;
-  currentIndex = 0;
+  
+  // Seviye seçildiğinde, o seviyeye ait yerel hafızadaki indeksleri yükle
+  window.VOCAB_INDEX = Number(localStorage.getItem("vocab_index_" + currentLevel) || 0);
+  window.GRAMMAR_INDEX = Number(localStorage.getItem("grammar_index_" + currentLevel) || 0);
+  window.MATCH_INDEX = Number(localStorage.getItem("match_index_" + currentLevel) || 0);
+  
+  currentIndex = window.VOCAB_INDEX;
 
   localStorage.setItem("selectedLevel", currentLevel);
 
@@ -691,6 +697,8 @@ function loadVocabularyMode(){
 
       setTimeout(() => {
         currentIndex++;
+        window.VOCAB_INDEX = currentIndex; // Global state senkronizasyonu
+        syncEconomy();                     // Kalıcı veriyi kaydet
         globalLock = false;
         renderMode();
       }, 650);
@@ -737,6 +745,8 @@ function loadGrammarMode(){
 
       setTimeout(() => {
         currentIndex++;
+        window.GRAMMAR_INDEX = currentIndex; // Global state senkronizasyonu
+        syncEconomy();                       // Kalıcı veriyi kaydet
         globalLock = false;
         renderMode();
       }, 700);
@@ -797,7 +807,6 @@ function loadMatchMode(){
 
     l.innerText = item.en;
     r.innerText = trPool[i];
-
     l.dataset.key = item.tr;
     r.dataset.key = trPool[i];
 
@@ -837,6 +846,8 @@ function loadMatchMode(){
 
           if(matchedCount >= 5){
             currentIndex++;
+            window.MATCH_INDEX = currentIndex; // Global state senkronizasyonu
+            syncEconomy();                     // Kalıcı veriyi kaydet
             renderMode();
           }
         } else {
@@ -861,6 +872,11 @@ function loadMatchMode(){
 function syncEconomy(){
   localStorage.setItem("correct", correct);
   localStorage.setItem("wrong", wrong);
+  
+  // Mod indekslerini seviye bazlı olarak yerel hafızaya kaydet
+  localStorage.setItem("vocab_index_" + currentLevel, window.VOCAB_INDEX || 0);
+  localStorage.setItem("grammar_index_" + currentLevel, window.GRAMMAR_INDEX || 0);
+  localStorage.setItem("match_index_" + currentLevel, window.MATCH_INDEX || 0);
 }
 
 function updateStats(){
@@ -1038,6 +1054,8 @@ window.addEventListener("DOMContentLoaded", async () => {
 
   koduManuelGirisEkraniGoster();
 });
+
+
 </script>
 </body>
 </html>
