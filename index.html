@@ -625,21 +625,47 @@ function getGrammarBank(){
   return cache.grammar[key];
 }
 
+/* ================= RESET ENGINE (BAŞA DÖNME SİSTEMİ) ================= */
+function modIndeksiniSifirla() {
+  currentIndex = 0;
+  if(currentMode === "vocabulary") window.VOCAB_INDEX = 0;
+  if(currentMode === "grammar") window.GRAMMAR_INDEX = 0;
+  if(currentMode === "match") window.MATCH_INDEX = 0;
+  
+  syncEconomy(); // Sıfırlanan indeksi anında hem LocalStorage hem de Redis'e basar
+  renderMode();
+}
+
+function renderBitisEkrani(mesaj) {
+  const qBox = document.getElementById("question");
+  const optBox = document.getElementById("options");
+  
+  if(qBox) qBox.innerHTML = `<span style="color:#1868f9; font-weight:bold;">🎉 Tebrikler!</span><br><span style="font-size:18px; color:#555; display:inline-block; margin-top:8px;">${mesaj}</span>`;
+  
+  if(optBox) {
+    optBox.innerHTML = `
+      <div style="width:100%; display:flex; justify-content:center; margin-top:10px;">
+        <button onclick="modIndeksiniSifirla()" style="width:100%; max-width:280px; height:58px; background:#1868f9; color:white; font-size:18px; font-weight:bold; border:none; border-radius:18px; cursor:pointer; box-shadow:0 4px 15px rgba(24,104,249,0.2); transition: transform 0.1s ease;">🔄 Başa Dön ve Tekrar Çöz</button>
+      </div>
+    `;
+  }
+}
+
 /* ================= CHALLENGE ENGINES ================= */
 function loadVocabularyMode(){
-  const panel = document.querySelector(".panel");
-  const avatarWrap = document.getElementById("avatarWrap");
-
-  if(panel) panel.style.display = "block";
-  if(avatarWrap) avatarWrap.style.display = "flex";
-
   const bank = getVocabBank();
-  if(!Array.isArray(bank) || bank.length < 4){
+  if(!Array.isArray(bank) || bank.length === 0){
     document.getElementById("question").innerText = "Vocabulary data missing";
     return;
   }
 
-  const q = bank[currentIndex % bank.length];
+  // 🏁 BİTİŞ KONTROLÜ: Eğer mevcut indeks soru bankası boyutuna ulaştıysa bitiş ekranını bas
+  if (currentIndex >= bank.length) {
+    renderBitisEkrani("Bu seviyedeki tüm kelime sorularını başarıyla tamamladınız.");
+    return;
+  }
+
+  const q = bank[currentIndex];
   document.getElementById("question").innerText = q.en;
 
   const optBox = document.getElementById("options");
@@ -694,7 +720,13 @@ function loadGrammarMode(){
     return;
   }
 
-  const q = bank[currentIndex % bank.length];
+  // 🏁 BİTİŞ KONTROLÜ
+  if (currentIndex >= bank.length) {
+    renderBitisEkrani("Bu seviyedeki tüm gramer yapılarını başarıyla tamamladınız.");
+    return;
+  }
+
+  const q = bank[currentIndex];
   document.getElementById("question").innerText = q.q;
 
   const optBox = document.getElementById("options");
@@ -737,13 +769,11 @@ function loadGrammarMode(){
 function loadMatchMode(){
   const panel = document.querySelector(".panel");
   const avatarWrap = document.getElementById("avatarWrap");
-
-  if(panel) panel.style.display = "block";
-  if(avatarWrap) avatarWrap.style.display = "flex";
-
   const qBox = document.getElementById("question");
   const optBox = document.getElementById("options");
 
+  if(panel) panel.style.display = "block";
+  if(avatarWrap) avatarWrap.style.display = "flex";
   if(panel) panel.classList.add("matchMode");
 
   const bank = getVocabBank();
@@ -752,7 +782,21 @@ function loadMatchMode(){
     return;
   }
 
-  const data = [...bank].sort(() => Math.random() - 0.5).slice(0, 5);
+  // 🏁 BİTİŞ KONTROLÜ: Eşleştirme modunda her adımda 5 kelime tüketildiği için (indeks * 5) hesabı yapılır
+  if ((currentIndex * 5) >= bank.length) {
+    renderBitisEkrani("Bu seviyedeki tüm kelime eşleştirmelerini başarıyla tamamladınız.");
+    return;
+  }
+
+  // Her seferinde indeks sırasına göre sonraki 5 kelimeyi getirir
+  const startIdx = (currentIndex * 5) % bank.length;
+  const data = bank.slice(startIdx, startIdx + 5);
+  
+  if (data.length < 5) {
+    renderBitisEkrani("Bu seviyedeki tüm kelime eşleştirmelerini başarıyla tamamladınız.");
+    return;
+  }
+
   const trPool = data.map(x => x.tr).sort(() => Math.random() - 0.5);
 
   const leftCol = document.createElement("div");
@@ -846,7 +890,6 @@ function syncEconomy(){
   localStorage.setItem("grammar_index_" + currentLevel, window.GRAMMAR_INDEX || 0);
   localStorage.setItem("match_index_" + currentLevel, window.MATCH_INDEX || 0);
 
-  // ☁️ BULUT SENKRONİZASYONU: Doğru ve Yanlış istatistikleri de eklenerek sunucuya sessizce kaydeder
   const dId = getDeviceFingerprint();
   fetch('/api/verify', {
     method: 'POST',
@@ -871,11 +914,9 @@ function updateStats(){
   if(wEl) wEl.innerText = wrong;
 }
 
-// ☁️ Sunucudan dönen veri silinmiş yerel belleği ve istatistikleri ayağa kaldırır
 function restoreProgressFromServer(progress) {
   if (!progress) return;
   
-  // Genel Skorları geri yükle
   if (progress.correct !== undefined) {
     correct = Number(progress.correct);
     localStorage.setItem("correct", correct);
@@ -885,7 +926,6 @@ function restoreProgressFromServer(progress) {
     localStorage.setItem("wrong", wrong);
   }
 
-  // Seviye İndekslerini geri yükle
   Object.keys(progress).forEach(level => {
     if (level === "correct" || level === "wrong") return;
     const lvlData = progress[level];
@@ -898,7 +938,7 @@ function restoreProgressFromServer(progress) {
   updateStats();
 }
 
-/* ================= MODERN DİNAMİK GİRİŞ EKRANI (EKRAN GÖRÜNTÜSÜ MODELİ) ================= */
+/* ================= MODERN DİNAMİK GİRİŞ EKRANI ================= */
 function koduManuelGirisEkraniGoster(mesaj = "") {
   const gate = document.getElementById("levelGate");
   const app = document.getElementById("app");
@@ -934,7 +974,6 @@ async function manuelKodOnayla() {
   await kodDogrulamaIstegiGonder(girilenKod);
 }
 
-// 🔒 Veri temizlense dahi bozulmayan kararlı cihaz parmak izi fonksiyonu
 function getDeviceFingerprint() {
   const w = window.screen.width || 0;
   const h = window.screen.height || 0;
@@ -1066,6 +1105,7 @@ window.addEventListener("DOMContentLoaded", async () => {
 
   koduManuelGirisEkraniGoster();
 });
+      
 
 </script>
 </body>
