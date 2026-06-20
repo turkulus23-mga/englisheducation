@@ -80,7 +80,6 @@ export default async function handler(req, res) {
       await redis.set(`used:${temizKod}`, deviceId);
 
       // Öğrenci cihazına uygulamada kalması için 1 yıl geçerli bir token veriyoruz
-      // Token değerine cihaz bilgisini de bağlayarak güvenliği artırıyoruz
       const tokenPayload = JSON.stringify({ level: onaylananSeviye, deviceId: deviceId });
       const rastgeleToken = 'TOKEN_' + Math.random().toString(36).substring(2) + Date.now().toString(36);
       await redis.set(`token:${rastgeleToken}`, tokenPayload, { EX: 60 * 60 * 24 * 365 });
@@ -122,7 +121,7 @@ export default async function handler(req, res) {
         return res.status(400).json({ error: 'Geçersiz veya eksik cihaz kimliği' });
       }
 
-      const { levelKey, vocabIndex, grammarIndex, matchIndex } = req.body;
+      const { levelKey, vocabIndex, grammarIndex, matchIndex, correct, wrong } = req.body;
       if (!levelKey) return res.status(400).json({ error: 'Seviye belirtilmedi' });
 
       // Mevcut cihaz verilerini çekiyoruz
@@ -134,6 +133,10 @@ export default async function handler(req, res) {
       if (vocabIndex !== undefined) currentProgress[levelKey].vocabIndex = Number(vocabIndex);
       if (grammarIndex !== undefined) currentProgress[levelKey].grammarIndex = Number(grammarIndex);
       if (matchIndex !== undefined) currentProgress[levelKey].matchIndex = Number(matchIndex);
+      
+      // Toplam istatistikleri doğrudan ana progress objesinde saklıyoruz
+      if (correct !== undefined) currentProgress.correct = Number(correct);
+      if (wrong !== undefined) currentProgress.wrong = Number(wrong);
 
       // 1 yıl süreyle kalıcı ilerleme olarak Redis'e yazıyoruz
       await redis.set(`progress:${deviceId}`, JSON.stringify(currentProgress), { EX: 60 * 60 * 24 * 365 });
