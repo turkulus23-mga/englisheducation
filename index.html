@@ -678,7 +678,7 @@ function loadVocabularyMode(){
       setTimeout(() => {
         currentIndex++;
         window.VOCAB_INDEX = currentIndex;
-        syncEconomy(); // Hem Local'e hem de API yardımıyla Bulut Veritabanına kaydeder
+        syncEconomy();
         globalLock = false;
         renderMode();
       }, 650);
@@ -846,7 +846,7 @@ function syncEconomy(){
   localStorage.setItem("grammar_index_" + currentLevel, window.GRAMMAR_INDEX || 0);
   localStorage.setItem("match_index_" + currentLevel, window.MATCH_INDEX || 0);
 
-  // ☁️ BULUT SENKRONİZASYONU: Arka planda sunucuya sessizce kaydet
+  // ☁️ BULUT SENKRONİZASYONU: Doğru ve Yanlış istatistikleri de eklenerek sunucuya sessizce kaydeder
   const dId = getDeviceFingerprint();
   fetch('/api/verify', {
     method: 'POST',
@@ -857,7 +857,9 @@ function syncEconomy(){
       levelKey: currentLevel,
       vocabIndex: window.VOCAB_INDEX || 0,
       grammarIndex: window.GRAMMAR_INDEX || 0,
-      matchIndex: window.MATCH_INDEX || 0
+      matchIndex: window.MATCH_INDEX || 0,
+      correct: correct,
+      wrong: wrong
     })
   }).catch(e => console.warn("Cloud sync failed temporarily:", e));
 }
@@ -869,10 +871,23 @@ function updateStats(){
   if(wEl) wEl.innerText = wrong;
 }
 
-// ☁️ Sunucudan dönen veri silinmiş yerel belleği ayağa kaldırır
+// ☁️ Sunucudan dönen veri silinmiş yerel belleği ve istatistikleri ayağa kaldırır
 function restoreProgressFromServer(progress) {
   if (!progress) return;
+  
+  // Genel Skorları geri yükle
+  if (progress.correct !== undefined) {
+    correct = Number(progress.correct);
+    localStorage.setItem("correct", correct);
+  }
+  if (progress.wrong !== undefined) {
+    wrong = Number(progress.wrong);
+    localStorage.setItem("wrong", wrong);
+  }
+
+  // Seviye İndekslerini geri yükle
   Object.keys(progress).forEach(level => {
+    if (level === "correct" || level === "wrong") return;
     const lvlData = progress[level];
     if (lvlData) {
       if (lvlData.vocabIndex !== undefined) localStorage.setItem("vocab_index_" + level, lvlData.vocabIndex);
@@ -880,6 +895,7 @@ function restoreProgressFromServer(progress) {
       if (lvlData.matchIndex !== undefined) localStorage.setItem("match_index_" + level, lvlData.matchIndex);
     }
   });
+  updateStats();
 }
 
 /* ================= MODERN DİNAMİK GİRİŞ EKRANI (EKRAN GÖRÜNTÜSÜ MODELİ) ================= */
@@ -918,14 +934,13 @@ async function manuelKodOnayla() {
   await kodDogrulamaIstegiGonder(girilenKod);
 }
 
-// 🔒 Geliştirilmiş, veri temizlense dahi bozulmayan kararlı cihaz parmak izi fonksiyonu
+// 🔒 Veri temizlense dahi bozulmayan kararlı cihaz parmak izi fonksiyonu
 function getDeviceFingerprint() {
   const w = window.screen.width || 0;
   const h = window.screen.height || 0;
   const c = window.screen.colorDepth || 0;
   const cores = window.navigator.hardwareConcurrency || 2;
   
-  // userAgent içindeki tarayıcı sürüm numaralarını temizleyip sadece ana işletim sistemi mimarisini alırız
   const uaClean = (window.navigator.userAgent || "").replace(/\/[0-9.]+/g, ""); 
   const rawId = `${w}x${h}_${c}_cores${cores}_ua:${uaClean}`;
   
@@ -949,7 +964,7 @@ async function kodDogrulamaIstegiGonder(kod) {
 
     if (data.success) {
         localStorage.setItem('user_auth_token', data.token);
-        if (data.progress) restoreProgressFromServer(data.progress); // Sunucu ilerlemesini yerel belleğe yaz
+        if (data.progress) restoreProgressFromServer(data.progress);
         window.location.href = window.location.origin + window.location.pathname;
     } else {
         koduManuelGirisEkraniGoster(data.error);
@@ -1030,7 +1045,7 @@ window.addEventListener("DOMContentLoaded", async () => {
       const data = await res.json();
 
       if (data.success) {
-        if (data.progress) restoreProgressFromServer(data.progress); // Var olan oturumda da eşitle
+        if (data.progress) restoreProgressFromServer(data.progress);
         
         const urlLevel = urlParams.get("level");
         const validLevels = ["A1", "A2", "B1", "B2", "C1"];
@@ -1051,8 +1066,6 @@ window.addEventListener("DOMContentLoaded", async () => {
 
   koduManuelGirisEkraniGoster();
 });
-
-
 
 </script>
 </body>
