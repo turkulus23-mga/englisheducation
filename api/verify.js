@@ -28,6 +28,17 @@ function getActivationCodes() {
   return cachedCodes;
 }
 
+// Cihazın tüm seviyelerdeki ilerleme durumunu getiren yardımcı fonksiyon
+async function getDeviceProgress(redis, deviceId) {
+  if (!deviceId || deviceId === "UNKNOWN_DEV") return {};
+  const data = await redis.get(`progress:${deviceId}`);
+  try {
+    return data ? JSON.parse(data) : {};
+  } catch (e) {
+    return {};
+  }
+}
+
 export default async function handler(req, res) {
   // CORS ve Güvenlik Ayarları
   res.setHeader('Access-Control-Allow-Credentials', true);
@@ -41,6 +52,7 @@ export default async function handler(req, res) {
     const action = req.body?.action || req.query?.admin; 
     const code = req.body?.code || req.query?.kod;
     const token = req.body?.token || req.query?.token;
+    const deviceId = req.body?.deviceId || "UNKNOWN_DEV";
 
     const allCodes = getActivationCodes();
     const redis = await getRedis();
@@ -49,7 +61,6 @@ export default async function handler(req, res) {
     if (action === 'kontrol_et') {
       if (!code) return res.status(400).json({ error: 'Kod eksik' });
       const temizKod = code.trim().toUpperCase();
-      const deviceId = req.body?.deviceId || "UNKNOWN_DEV"; // Ön yüzden gelen parmak izi
 
       // Kontrol 1: Kod Vercel Env listesinde tanımlı bir kod mu?
       const onaylananSeviye = allCodes[temizKod];
@@ -69,21 +80,65 @@ export default async function handler(req, res) {
       await redis.set(`used:${temizKod}`, deviceId);
 
       // Öğrenci cihazına uygulamada kalması için 1 yıl geçerli bir token veriyoruz
+      // Token değerine cihaz bilgisini de bağlayarak güvenliği artırıyoruz
+      const tokenPayload = JSON.stringify({ level: onaylananSeviye, deviceId: deviceId });
       const rastgeleToken = 'TOKEN_' + Math.random().toString(36).substring(2) + Date.now().toString(36);
-      await redis.set(`token:${rastgeleToken}`, onaylananSeviye, { EX: 60 * 60 * 24 * 365 });
+      await redis.set(`token:${rastgeleToken}`, tokenPayload, { EX: 60 * 60 * 24 * 365 });
       
-      return res.status(200).json({ success: true, token: rastgeleToken, level: onaylananSeviye });
+      // Cihaz geçmişi silmiş olsa bile Redis'teki ilerlemesini getiriyoruz
+      const progress = await getDeviceProgress(redis, deviceId);
+
+      return res.status(200).json({ success: true, token: rastgeleToken, level: onaylananSeviye, progress: progress });
     }
 
     // ================= CİHAZ TOKEN DOĞRULAMA =================
     if (action === 'token_dogrula') {
       if (!token) return res.status(400).json({ error: 'Token eksik' });
-      const seviye = await redis.get(`token:${token}`);
-      if (seviye) {
-        return res.status(200).json({ success: true, level: seviye });
+      const rawTokenData = await redis.get(`token:${token}`);
+      
+      if (rawTokenData) {
+        let level = rawTokenData;
+        let verifiedDeviceId = deviceId;
+
+        // Eski string formatındaki tokenlar ile yeni JSON formatındaki tokenların uyumluluğu
+        try {
+          if (rawTokenData.startsWith('{')) {
+            const parsed = JSON.parse(rawTokenData);
+            level = parsed.level;
+            verifiedDeviceId = parsed.deviceId || deviceId;
+          }
+        } catch (e) {}
+
+        const progress = await getDeviceProgress(redis, verifiedDeviceId);
+        return res.status(200).json({ success: true, level: level, progress: progress });
       } else {
         return res.status(400).json({ error: 'Oturum süresi dolmuş veya geçersiz!' });
       }
+    }
+
+    // ================= KESİNTİSİZ İLERLEME KAYDETME SİSTEMİ =================
+    if (action === 'indeks_kaydet') {
+      if (!deviceId || deviceId === "UNKNOWN_DEV") {
+        return res.status(400).json({ error: 'Geçersiz veya eksik cihaz kimliği' });
+      }
+
+      const { levelKey, vocabIndex, grammarIndex, matchIndex } = req.body;
+      if (!levelKey) return res.status(400).json({ error: 'Seviye belirtilmedi' });
+
+      // Mevcut cihaz verilerini çekiyoruz
+      const currentProgress = await getDeviceProgress(redis, deviceId);
+
+      // İlgili seviye altındaki indeks değerlerini güncelliyoruz
+      if (!currentProgress[levelKey]) currentProgress[levelKey] = {};
+      
+      if (vocabIndex !== undefined) currentProgress[levelKey].vocabIndex = Number(vocabIndex);
+      if (grammarIndex !== undefined) currentProgress[levelKey].grammarIndex = Number(grammarIndex);
+      if (matchIndex !== undefined) currentProgress[levelKey].matchIndex = Number(matchIndex);
+
+      // 1 yıl süreyle kalıcı ilerleme olarak Redis'e yazıyoruz
+      await redis.set(`progress:${deviceId}`, JSON.stringify(currentProgress), { EX: 60 * 60 * 24 * 365 });
+
+      return res.status(200).json({ success: true });
     }
 
     res.setHeader('Content-Type', 'text/html; charset=utf-8');
