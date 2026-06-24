@@ -1,7 +1,0 @@
-<?xml version='1.0' encoding='utf-8'?>
-<resources>
-    <string name="app_name">englisheducation</string>
-    <string name="title_activity_main">englisheducation</string>
-    <string name="package_name">com.turkulus23.mga</string>
-    <string name="custom_url_scheme">com.turkulus23.mga</string>
-</resources>
