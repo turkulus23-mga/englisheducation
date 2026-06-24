@@ -1,4 +1,4 @@
-name: Android APK & AAB Build (Capacitor)
+name: Android APK & AAB Build (Capacitor - Stable)
 
 on:
   push:
@@ -17,25 +17,28 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      # ================= NODE (STABLE VERSION) =================
+      # ================= NODE (STABLE FIXED) =================
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: 22
 
-      # ================= INSTALL =================
+      # ================= INSTALL (FORCE CAPACITOR CLI) =================
       - name: Install dependencies
-        run: npm install
+        run: |
+          npm install
+          npm install @capacitor/core @capacitor/cli @capacitor/android
+          npx cap --version
 
-      # ================= VERIFY WEB DIR =================
-      - name: Check web directory
+      # ================= VERIFY PROJECT =================
+      - name: Check project structure
         run: |
           ls -la
-          ls -la www || echo "www folder exists"
+          ls -la www || echo "www folder missing"
 
-      # ================= CAPACITOR SYNC =================
+      # ================= CAPACITOR SYNC (DIRECT BINARY FIX) =================
       - name: Sync Capacitor
-        run: npx cap sync
+        run: ./node_modules/.bin/cap sync android
 
       # ================= JAVA =================
       - name: Setup Java 17
@@ -51,14 +54,14 @@ jobs:
           path: |
             ~/.gradle/caches
             ~/.gradle/wrapper
-          key: gradle-${{ runner.os }}
+          key: gradle-${{ runner.os }}-v1
 
-      # ================= GRADLE PERMISSION =================
+      # ================= GRADLE PERMISSIONS =================
       - name: Make Gradle executable
         run: chmod +x android/gradlew
 
       # ================= CLEAN =================
-      - name: Clean project
+      - name: Clean Android project
         working-directory: android
         run: ./gradlew clean --no-daemon
 
@@ -98,17 +101,17 @@ jobs:
           name: release-aab
           path: android/app/build/outputs/bundle/release/*.aab
 
-      # ================= GITHUB RELEASE =================
+      # ================= RELEASE =================
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
           tag_name: v${{ github.run_number }}
           name: Release v${{ github.run_number }}
           body: |
-            🚀 Capacitor Android Build Success
+            🚀 Capacitor Android Build Successful
 
             ✔ Debug APK
             ✔ Release APK
-            ✔ AAB (Play Store)
+            ✔ AAB (Play Store Ready)
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
