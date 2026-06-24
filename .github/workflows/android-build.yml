@@ -17,16 +17,21 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      # ================= NODE =================
+      # ================= NODE (STABLE VERSION) =================
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: 20
-          cache: npm
+          node-version: 22
 
       # ================= INSTALL =================
       - name: Install dependencies
         run: npm install
+
+      # ================= VERIFY WEB DIR =================
+      - name: Check web directory
+        run: |
+          ls -la
+          ls -la www || echo "www folder exists"
 
       # ================= CAPACITOR SYNC =================
       - name: Sync Capacitor
@@ -46,58 +51,64 @@ jobs:
           path: |
             ~/.gradle/caches
             ~/.gradle/wrapper
-          key: gradle-${{ runner.os }}-${{ hashFiles('**/*.gradle*', '**/gradle-wrapper.properties') }}
+          key: gradle-${{ runner.os }}
 
-      # ================= MAKE GRADLE EXECUTABLE =================
+      # ================= GRADLE PERMISSION =================
       - name: Make Gradle executable
         run: chmod +x android/gradlew
 
-      # ================= BUILD DEBUG APK =================
+      # ================= CLEAN =================
+      - name: Clean project
+        working-directory: android
+        run: ./gradlew clean --no-daemon
+
+      # ================= DEBUG APK =================
       - name: Build Debug APK
         working-directory: android
         run: ./gradlew assembleDebug --no-daemon
 
-      # ================= BUILD RELEASE APK =================
+      # ================= RELEASE APK =================
       - name: Build Release APK
         working-directory: android
         run: ./gradlew assembleRelease --no-daemon
 
-      # ================= BUILD AAB =================
+      # ================= AAB =================
       - name: Build AAB
         working-directory: android
         run: ./gradlew bundleRelease --no-daemon
 
-      # ================= UPLOAD APK =================
-      - name: Upload APK
+      # ================= UPLOAD DEBUG APK =================
+      - name: Upload Debug APK
         uses: actions/upload-artifact@v4
         with:
-          name: app-debug-apk
+          name: debug-apk
           path: android/app/build/outputs/apk/debug/*.apk
 
+      # ================= UPLOAD RELEASE APK =================
       - name: Upload Release APK
         uses: actions/upload-artifact@v4
         with:
-          name: app-release-apk
+          name: release-apk
           path: android/app/build/outputs/apk/release/*.apk
 
       # ================= UPLOAD AAB =================
       - name: Upload AAB
         uses: actions/upload-artifact@v4
         with:
-          name: app-release-aab
+          name: release-aab
           path: android/app/build/outputs/bundle/release/*.aab
 
-      # ================= RELEASE =================
+      # ================= GITHUB RELEASE =================
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
           tag_name: v${{ github.run_number }}
           name: Release v${{ github.run_number }}
           body: |
-            🚀 Auto Android Build (Capacitor)
+            🚀 Capacitor Android Build Success
 
-            ✔ APK Debug
-            ✔ APK Release
-            ✔ AAB Release
+            ✔ Debug APK
+            ✔ Release APK
+            ✔ AAB (Play Store)
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
