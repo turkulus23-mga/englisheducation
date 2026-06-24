@@ -1,0 +1,103 @@
+name: Android APK & AAB Build (Capacitor)
+
+on:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      # ================= CHECKOUT =================
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      # ================= NODE =================
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      # ================= INSTALL =================
+      - name: Install dependencies
+        run: npm install
+
+      # ================= CAPACITOR SYNC =================
+      - name: Sync Capacitor
+        run: npx cap sync
+
+      # ================= JAVA =================
+      - name: Setup Java 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+
+      # ================= GRADLE CACHE =================
+      - name: Cache Gradle
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+          key: gradle-${{ runner.os }}-${{ hashFiles('**/*.gradle*', '**/gradle-wrapper.properties') }}
+
+      # ================= MAKE GRADLE EXECUTABLE =================
+      - name: Make Gradle executable
+        run: chmod +x android/gradlew
+
+      # ================= BUILD DEBUG APK =================
+      - name: Build Debug APK
+        working-directory: android
+        run: ./gradlew assembleDebug --no-daemon
+
+      # ================= BUILD RELEASE APK =================
+      - name: Build Release APK
+        working-directory: android
+        run: ./gradlew assembleRelease --no-daemon
+
+      # ================= BUILD AAB =================
+      - name: Build AAB
+        working-directory: android
+        run: ./gradlew bundleRelease --no-daemon
+
+      # ================= UPLOAD APK =================
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: app-debug-apk
+          path: android/app/build/outputs/apk/debug/*.apk
+
+      - name: Upload Release APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: app-release-apk
+          path: android/app/build/outputs/apk/release/*.apk
+
+      # ================= UPLOAD AAB =================
+      - name: Upload AAB
+        uses: actions/upload-artifact@v4
+        with:
+          name: app-release-aab
+          path: android/app/build/outputs/bundle/release/*.aab
+
+      # ================= RELEASE =================
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v${{ github.run_number }}
+          name: Release v${{ github.run_number }}
+          body: |
+            🚀 Auto Android Build (Capacitor)
+
+            ✔ APK Debug
+            ✔ APK Release
+            ✔ AAB Release
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
