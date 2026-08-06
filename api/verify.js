@@ -1,9 +1,12 @@
 import { createClient } from 'redis';
+import crypto from 'crypto';
 
 let redisClient = null;
 let cachedCodes = null;
 
-// 1. Veritabanı Bağlantısı (Kullanılmış Kod Takibi İçin)
+// 5 Yıllık Süre (Saniye cinsinden: 5 * 365 * 24 * 60 * 60)
+const FIVE_YEARS_IN_SECONDS = 60 * 60 * 24 * 365 * 5;
+
 async function getRedis() {
   if (!redisClient) {
     const redisUrl = process.env.KV_URL || process.env.REDIS_URL;
@@ -14,7 +17,6 @@ async function getRedis() {
   return redisClient;
 }
 
-// 2. Vercel Env İçindeki 1500 Kodu Çözme Fonksiyonu
 function getActivationCodes() {
   if (!cachedCodes) {
     try {
@@ -28,7 +30,6 @@ function getActivationCodes() {
   return cachedCodes;
 }
 
-// Cihazın tüm seviyelerdeki ilerleme durumunu getiren yardımcı fonksiyon
 async function getDeviceProgress(redis, deviceId) {
   if (!deviceId || deviceId === "UNKNOWN_DEV") return {};
   const data = await redis.get(`progress:${deviceId}`);
@@ -40,7 +41,6 @@ async function getDeviceProgress(redis, deviceId) {
 }
 
 export default async function handler(req, res) {
-  // CORS ve Güvenlik Ayarları
   res.setHeader('Access-Control-Allow-Credentials', true);
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET,POST,OPTIONS');
@@ -57,34 +57,31 @@ export default async function handler(req, res) {
     const allCodes = getActivationCodes();
     const redis = await getRedis();
 
-    // ================= ÖĞRENCİ GİRİŞ KONTROLÜ (🔒 AKILLI TEK SEFERLİK & PARMAK İZİ KORUMALI) =================
+    // ================= ÖĞRENCİ GİRİŞ KONTROLÜ =================
     if (action === 'kontrol_et') {
       if (!code) return res.status(400).json({ error: 'Kod eksik' });
       const temizKod = code.trim().toUpperCase();
 
-      // Kontrol 1: Kod Vercel Env listesinde tanımlı bir kod mu?
       const onaylananSeviye = allCodes[temizKod];
       if (!onaylananSeviye) {
         return res.status(400).json({ error: 'Geçersiz aktivasyon kodu!' });
       }
 
-      // Kontrol 2: Bu kod daha önce kullanılmış mı?
-      const existingDevice = await redis.get(`used:${temizKod}`);
+      // KOD KİLİTLEME (RACE CONDITION ÇÖZÜMÜ)
+      const setSuccess = await redis.set(`used:${temizKod}`, deviceId, { NX: true });
       
-      // EĞER KOD DAHA ÖNCE KULLANILMIŞSA AMA AYNI CİHAZ TEKRAR GİRİYORSA (Geçmişi silmişse):
-      if (existingDevice && existingDevice !== deviceId) {
-        return res.status(400).json({ error: 'Bu aktivasyon kodu daha önce başka bir cihazda kullanılmış!' });
+      if (!setSuccess) {
+        const existingDevice = await redis.get(`used:${temizKod}`);
+        if (existingDevice !== deviceId) {
+          return res.status(400).json({ error: 'Bu aktivasyon kodu daha önce başka bir cihazda kullanılmış!' });
+        }
       }
 
-      // 🔒 KODU O CİHAZA KİLİTLEME: true yazmak yerine cihazın eşsiz ID'sini yazıyoruz
-      await redis.set(`used:${temizKod}`, deviceId);
-
-      // Öğrenci cihazına uygulamada kalması için 1 yıl geçerli bir token veriyoruz
+      // 5 YILLIK TOKEN ÜRETİMİ
       const tokenPayload = JSON.stringify({ level: onaylananSeviye, deviceId: deviceId });
-      const rastgeleToken = 'TOKEN_' + Math.random().toString(36).substring(2) + Date.now().toString(36);
-      await redis.set(`token:${rastgeleToken}`, tokenPayload, { EX: 60 * 60 * 24 * 365 });
+      const rastgeleToken = 'TOKEN_' + crypto.randomBytes(24).toString('hex');
+      await redis.set(`token:${rastgeleToken}`, tokenPayload, { EX: FIVE_YEARS_IN_SECONDS });
       
-      // Cihaz geçmişi silmiş olsa bile Redis'teki ilerlemesini getiriyoruz
       const progress = await getDeviceProgress(redis, deviceId);
 
       return res.status(200).json({ success: true, token: rastgeleToken, level: onaylananSeviye, progress: progress });
@@ -99,7 +96,6 @@ export default async function handler(req, res) {
         let level = rawTokenData;
         let verifiedDeviceId = deviceId;
 
-        // Eski string formatındaki tokenlar ile yeni JSON formatındaki tokenların uyumluluğu
         try {
           if (rawTokenData.startsWith('{')) {
             const parsed = JSON.parse(rawTokenData);
@@ -108,6 +104,9 @@ export default async function handler(req, res) {
           }
         } catch (e) {}
 
+        // Her doğrulamada token süresini 5 yıl daha uzatıyoruz (Sürekli aktif kalması için)
+        await redis.expire(`token:${token}`, FIVE_YEARS_IN_SECONDS);
+
         const progress = await getDeviceProgress(redis, verifiedDeviceId);
         return res.status(200).json({ success: true, level: level, progress: progress });
       } else {
@@ -115,7 +114,7 @@ export default async function handler(req, res) {
       }
     }
 
-    // ================= KESİNTİSİZ İLERLEME KAYDETME SİSTEMİ =================
+    // ================= İLERLEME KAYDETME =================
     if (action === 'indeks_kaydet') {
       if (!deviceId || deviceId === "UNKNOWN_DEV") {
         return res.status(400).json({ error: 'Geçersiz veya eksik cihaz kimliği' });
@@ -124,22 +123,19 @@ export default async function handler(req, res) {
       const { levelKey, vocabIndex, grammarIndex, matchIndex, correct, wrong } = req.body;
       if (!levelKey) return res.status(400).json({ error: 'Seviye belirtilmedi' });
 
-      // Mevcut cihaz verilerini çekiyoruz
       const currentProgress = await getDeviceProgress(redis, deviceId);
 
-      // İlgili seviye altındaki indeks değerlerini güncelliyoruz
       if (!currentProgress[levelKey]) currentProgress[levelKey] = {};
       
       if (vocabIndex !== undefined) currentProgress[levelKey].vocabIndex = Number(vocabIndex);
       if (grammarIndex !== undefined) currentProgress[levelKey].grammarIndex = Number(grammarIndex);
       if (matchIndex !== undefined) currentProgress[levelKey].matchIndex = Number(matchIndex);
       
-      // Toplam istatistikleri doğrudan ana progress objesinde saklıyoruz
       if (correct !== undefined) currentProgress.correct = Number(correct);
       if (wrong !== undefined) currentProgress.wrong = Number(wrong);
 
-      // 1 yıl süreyle kalıcı ilerleme olarak Redis'e yazıyoruz
-      await redis.set(`progress:${deviceId}`, JSON.stringify(currentProgress), { EX: 60 * 60 * 24 * 365 });
+      // İlerleme kaydedilirken süreyi 5 yıl olarak yeniliyoruz
+      await redis.set(`progress:${deviceId}`, JSON.stringify(currentProgress), { EX: FIVE_YEARS_IN_SECONDS });
 
       return res.status(200).json({ success: true });
     }
