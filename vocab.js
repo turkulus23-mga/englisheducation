@@ -2423,82 +2423,82 @@ window.vocab_A2 = [
     "topic": "core"
   },
   {
-    "en": "try_x",
+    "en": "try",
     "tr": "",
     "topic": "core"
   },
   {
-    "en": "hope_x",
+    "en": "hope",
     "tr": "",
     "topic": "core"
   },
   {
-    "en": "expect_x",
+    "en": "expect",
     "tr": "",
     "topic": "core"
   },
   {
-    "en": "prefer_x",
+    "en": "prefer",
     "tr": "",
     "topic": "core"
   },
   {
-    "en": "decide_x",
+    "en": "decide",
     "tr": "",
     "topic": "core"
   },
   {
-    "en": "exit_x",
+    "en": "exit",
     "tr": "",
     "topic": "core"
   },
   {
-    "en": "enter_x",
+    "en": "enter",
     "tr": "",
     "topic": "core"
   },
   {
-    "en": "lead_x",
+    "en": "lead",
     "tr": "",
     "topic": "core"
   },
   {
-    "en": "follow_x",
+    "en": "follow",
     "tr": "",
     "topic": "core"
   },
   {
-    "en": "prove_x",
+    "en": "prove",
     "tr": "",
     "topic": "core"
   },
   {
-    "en": "show_x",
+    "en": "show",
     "tr": "",
     "topic": "core"
   },
   {
-    "en": "explain_x",
+    "en": "explain",
     "tr": "",
     "topic": "core"
   },
   {
-    "en": "return_x",
+    "en": "return",
     "tr": "",
     "topic": "core"
   },
   {
-    "en": "accept_x",
+    "en": "accept",
     "tr": "",
     "topic": "core"
   },
   {
-    "en": "offer_x",
+    "en": "offer",
     "tr": "",
     "topic": "core"
   },
   {
-    "en": "refuse_x",
+    "en": "refuse",
     "tr": "",
     "topic": "core"
   }
@@ -4296,212 +4296,212 @@ window.vocab_B1 = [
     "topic": "core"
   },
   {
-    "en": "interpretation_x",
+    "en": "interpretation",
     "tr": "",
     "topic": "core"
   },
   {
-    "en": "definition_x",
+    "en": "definition",
     "tr": "",
     "topic": "core"
   },
   {
-    "en": "organization_x",
+    "en": "organization",
     "tr": "",
     "topic": "core"
   },
   {
-    "en": "implementation_x",
+    "en": "implementation",
     "tr": "",
     "topic": "core"
   },
   {
-    "en": "evaluation_x",
+    "en": "evaluation",
     "tr": "",
     "topic": "core"
   },
   {
-    "en": "comparison_x",
+    "en": "comparison",
     "tr": "",
     "topic": "core"
   },
   {
-    "en": "connection_x",
+    "en": "connection",
     "tr": "",
     "topic": "core"
   },
   {
-    "en": "reaction_x",
+    "en": "reaction",
     "tr": "",
     "topic": "core"
   },
   {
-    "en": "interaction_x",
+    "en": "interaction",
     "tr": "",
     "topic": "core"
   },
   {
-    "en": "discussion_x",
+    "en": "discussion",
     "tr": "",
     "topic": "core"
   },
   {
-    "en": "economy_x",
+    "en": "economy",
     "tr": "",
     "topic": "core"
   },
   {
-    "en": "policy_x",
+    "en": "policy",
     "tr": "",
     "topic": "core"
   },
   {
-    "en": "system_x",
+    "en": "system",
     "tr": "",
     "topic": "core"
   },
   {
-    "en": "growth_x",
+    "en": "growth",
     "tr": "",
     "topic": "core"
   },
   {
-    "en": "change_x",
+    "en": "change",
     "tr": "",
     "topic": "core"
   },
   {
-    "en": "challenge_x",
+    "en": "challenge",
     "tr": "",
     "topic": "core"
   },
   {
-    "en": "progress_x",
+    "en": "progress",
     "tr": "",
     "topic": "core"
   },
   {
-    "en": "performance_x",
+    "en": "performance",
     "tr": "",
     "topic": "core"
   },
   {
-    "en": "motivation_x",
+    "en": "motivation",
     "tr": "",
     "topic": "core"
   },
   {
-    "en": "attitude_x",
+    "en": "attitude",
     "tr": "",
     "topic": "core"
   },
   {
-    "en": "skill_x",
+    "en": "skill",
     "tr": "",
     "topic": "core"
   },
   {
-    "en": "ability_x",
+    "en": "ability",
     "tr": "",
     "topic": "core"
   },
   {
-    "en": "experience_x",
+    "en": "experience",
     "tr": "",
     "topic": "core"
   },
   {
-    "en": "knowledge_x",
+    "en": "knowledge",
     "tr": "",
     "topic": "core"
   },
   {
-    "en": "information_x",
+    "en": "information",
     "tr": "",
     "topic": "core"
   },
   {
-    "en": "data_x",
+    "en": "data",
     "tr": "",
     "topic": "core"
   },
   {
-    "en": "evidence_x",
+    "en": "evidence",
     "tr": "",
     "topic": "core"
   },
   {
-    "en": "research_x",
+    "en": "research",
     "tr": "",
     "topic": "core"
   },
   {
-    "en": "theory_x",
+    "en": "theory",
     "tr": "",
     "topic": "core"
   },
   {
-    "en": "concept_x",
+    "en": "concept",
     "tr": "",
     "topic": "core"
   },
   {
-    "en": "argument_x",
+    "en": "argument",
     "tr": "",
     "topic": "core"
   },
   {
-    "en": "debate_x",
+    "en": "debate",
     "tr": "",
     "topic": "core"
   },
   {
-    "en": "issue_x",
+    "en": "issue",
     "tr": "",
     "topic": "core"
   },
   {
-    "en": "problem_x",
+    "en": "problem",
     "tr": "",
     "topic": "core"
   },
   {
-    "en": "solution_x",
+    "en": "solution",
     "tr": "",
     "topic": "core"
   },
   {
-    "en": "influence_x",
+    "en": "influence",
     "tr": "",
     "topic": "core"
   },
   {
-    "en": "society_x",
+    "en": "society",
     "tr": "",
     "topic": "core"
   },
   {
-    "en": "culture_x",
+    "en": "culture",
     "tr": "",
     "topic": "core"
   },
   {
-    "en": "technology_x",
+    "en": "technology",
     "tr": "",
     "topic": "core"
   },
   {
-    "en": "environment_x",
+    "en": "environment",
     "tr": "",
     "topic": "core"
   },
   {
-    "en": "opportunity_x",
+    "en": "opportunity",
     "tr": "",
     "topic": "core"
   },
   {
-    "en": "responsibility_x",
+    "en": "responsibility",
     "tr": "",
     "topic": "core"
   }
