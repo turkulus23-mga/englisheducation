@@ -2473,7 +2473,7 @@ window.vocab_C1 = [
 { "en": "redundancy", "tr": "yedeklilik (sistem)", "topic": "systems" },
 { "en": "leverage point", "tr": "kaldıraç noktası", "topic": "systems" },
 { "en": "epistemic humility", "tr": "epistemik alçakgönüllülük", "topic": "philosophy" },
-{ "en": "moral agency", "tr": "ahlaki failllik", "topic": "philosophy" },
+{ "en": "moral agency", "tr": "ahlaki faillik", "topic": "philosophy" },
 { "en": "phenomenological reduction", "tr": "fenomenolojik indirgeme", "topic": "philosophy" },
 { "en": "aesthetic judgment", "tr": "estetik yargı", "topic": "philosophy" },
 { "en": "epistemic authority", "tr": "epistemik otorite", "topic": "philosophy" },
