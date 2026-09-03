@@ -21,6 +21,18 @@ height:100%;
 overflow:hidden;
 }
 
+/* ─── LANGUAGE GATE ────────────────────────────────────── */
+#languageGate{
+display:none;
+flex-direction:column;
+align-items:center;
+justify-content:center;
+height:100dvh;
+background:#000;
+overflow:hidden;
+padding:20px;
+}
+
 /* ─── LEVEL GATE ─────────────────────────────────────────── */
 #levelGate{
 display:flex;
@@ -440,9 +452,38 @@ KÜÇÜK TELEFON ≤ 390px
 </head>
 <body>
 
+<!-- DİL SEÇİM EKRANI -->
+<div id="languageGate">
+  <h2 style="color:white; font-size:22px; margin-bottom:15px; font-weight:bold; text-align:center;">Lütfen Bir Dil Seçin</h2>
+  
+  <div style="position:relative; display:inline-block; width:100%; max-width:420px; border-radius:20px; overflow:hidden; box-shadow: 0 10px 25px rgba(0,0,0,0.5);">
+    
+    <!-- GitHub Reponuzdaki Görsel -->
+    <img src="./lang_select.png" alt="Dil Seçimi" style="width:100%; display:block;">
+
+    <!-- İNGİLİZCE TIKLAMA ALANI (Sol Yarı) -->
+    <div id="btn-lang-en" onclick="selectLanguage('en')" 
+         style="position:absolute; top:0; left:0; width:50%; height:100%; cursor:pointer;" 
+         title="İngilizce Öğren">
+    </div>
+
+    <!-- İSPANYOLCA TIKLAMA ALANI (Sağ Yarı) -->
+    <div id="btn-lang-es" style="position:absolute; top:0; right:0; width:50%; height:100%; cursor:pointer;" 
+         title="İspanyolca Öğren">
+      
+      <!-- KİLİT KATMANI (İspanyolca Yetkisi Yoksa Görünür) -->
+      <div id="es-lock-overlay" style="display:none; position:absolute; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.7); color:white; flex-direction:column; justify-content:center; align-items:center; backdrop-filter: blur(3px);">
+        <span style="font-size:36px;">🔒</span>
+        <span style="font-size:13px; font-weight:bold; margin-top:8px; padding:0 10px;">Paket Kilitli</span>
+      </div>
+    </div>
+
+  </div>
+</div>
+
 <div id="levelGate" style="display:none;">
 <div id="levelCard">
-<h2 class="levelTitle">Select Level</h2>
+<h2 class="levelTitle" id="levelGateTitle">Select Level</h2>
 
 <button data-level="A1" onclick="chooseLevel('A1')">A1</button>
 <button data-level="A2" onclick="chooseLevel('A2')">A2</button>
@@ -460,15 +501,15 @@ KÜÇÜK TELEFON ≤ 390px
 <div id="profileInfo">
 <div id="playerName">MGA</div>
 <div id="statsRow">
-<div class="topStat">✔ Correct: <span id="correct">0</span></div>
-<div class="topStat">❌ Wrong: <span id="wrong">0</span></div>
+<div class="topStat" id="correctStatLabel">✔ Correct: <span id="correct">0</span></div>
+<div class="topStat" id="wrongStatLabel">❌ Wrong: <span id="wrong">0</span></div>
 </div>
 </div>
 </div>
 <div id="modeBar">
-<button onclick="setMode('vocabulary')">Vocabulary</button>
-<button onclick="setMode('grammar')">Grammar</button>
-<button onclick="setMode('match')">Match</button>
+<button id="btnModeVocab" onclick="setMode('vocabulary')">Vocabulary</button>
+<button id="btnModeGrammar" onclick="setMode('grammar')">Grammar</button>
+<button id="btnModeMatch" onclick="setMode('match')">Match</button>
 </div>
 </header>
 
@@ -493,14 +534,88 @@ KÜÇÜK TELEFON ≤ 390px
 </div>
 </div>
 
+<!-- DİL VERİ SETLERİ -->
 <script src="./grammar_A1.js"></script>
 <script src="./grammar_A2.js"></script>
 <script src="./grammar_B1.js"></script>
 <script src="./grammar_B2.js"></script>
 <script src="./grammar_C1.js"></script>
 <script src="./vocab.js"></script>
+<script src="./grammar_A1_es.js"></script>
+<script src="./grammar_A2_es.js"></script>
+<script src="./grammar_B1_es.js"></script>
+<script src="./grammar_B2_es.js"></script>
+<script src="./grammar_C1_es.js"></script>
+<script src="./vocab_es.js"></script>
 
 <script>
+
+/* ================= I18N DİL SÖZLÜĞÜ ================= */
+const uiTranslations = {
+  en: {
+    loginTitle: "Login",
+    loginPlaceholder: "Kodu Giriniz",
+    loginBtn: "Login",
+    selectLevel: "Select Level",
+    correct: "Correct",
+    wrong: "Wrong",
+    vocabulary: "Vocabulary",
+    grammar: "Grammar",
+    match: "Match",
+    vocabChallenge: "Vocabulary Challenge",
+    grammarChallenge: "Grammar Challenge",
+    matchChallenge: "Match Challenge"
+  },
+  es: {
+    loginTitle: "Iniciar Sesión",
+    loginPlaceholder: "Ingrese el código",
+    loginBtn: "Iniciar Sesión",
+    selectLevel: "Seleccionar Nivel",
+    correct: "Correcto",
+    wrong: "Incorrecto",
+    vocabulary: "Vocabulario",
+    grammar: "Gramática",
+    match: "Emparejar",
+    vocabChallenge: "Desafío de Vocabulario",
+    grammarChallenge: "Desafío de Gramática",
+    matchChallenge: "Desafío de Emparejamiento"
+  }
+};
+
+function updateUIStrings(lang) {
+  const t = uiTranslations[lang] || uiTranslations.en;
+
+  // Login Ekranı
+  const loginTitleEl = document.getElementById("loginTitleText");
+  if (loginTitleEl) loginTitleEl.textContent = t.loginTitle;
+
+  const loginInputEl = document.getElementById("manualCodeInput");
+  if (loginInputEl) loginInputEl.placeholder = t.loginPlaceholder;
+
+  const loginBtnEl = document.getElementById("btnVerifyCode");
+  if (loginBtnEl) loginBtnEl.textContent = t.loginBtn;
+
+  // Seviye Seçim Başlığı
+  const selectLevelEl = document.getElementById("levelGateTitle");
+  if (selectLevelEl) selectLevelEl.textContent = t.selectLevel;
+
+  // Üst Mod Butonları
+  const vocabBtn = document.getElementById("btnModeVocab");
+  if (vocabBtn) vocabBtn.textContent = t.vocabulary;
+
+  const grammarBtn = document.getElementById("btnModeGrammar");
+  if (grammarBtn) grammarBtn.textContent = t.grammar;
+
+  const matchBtn = document.getElementById("btnModeMatch");
+  if (matchBtn) matchBtn.textContent = t.match;
+
+  // Sayaçlar
+  const correctLabel = document.getElementById("correctStatLabel");
+  if (correctLabel) correctLabel.innerHTML = `✔ ${t.correct}: <span id="correct">${correct}</span>`;
+
+  const wrongLabel = document.getElementById("wrongStatLabel");
+  if (wrongLabel) wrongLabel.innerHTML = `❌ ${t.wrong}: <span id="wrong">${wrong}</span>`;
+}
 
 /* ================= GLOBAL STATE ENGINE ================= */
 let currentIndex = 0;
@@ -508,6 +623,8 @@ let currentMode = "vocabulary";
 let vocabularyIndex = 0;
 let grammarIndex = 0;
 let currentLevel = "A1";
+let currentLanguage = "en";
+let allowedLanguages = ["en"];
 let selectedCard = null;
 let globalLock = false;
 
@@ -515,6 +632,42 @@ const cache = { vocab: {}, grammar: {} };
 
 let correct = Number(localStorage.getItem("correct") || 0);
 let wrong = Number(localStorage.getItem("wrong") || 0);
+
+/* ================= LANGUAGE CONTROL ================= */
+function showLanguageSelection(languages) {
+  allowedLanguages = languages || ["en"];
+  const langGate = document.getElementById("languageGate");
+  const esBtn = document.getElementById("btn-lang-es");
+  const esLockOverlay = document.getElementById("es-lock-overlay");
+
+  if(langGate) langGate.style.display = "flex";
+
+  if (allowedLanguages.includes("es")) {
+    esLockOverlay.style.display = "none";
+    esBtn.style.cursor = "pointer";
+    esBtn.onclick = () => selectLanguage("es");
+  } else {
+    esLockOverlay.style.display = "flex";
+    esBtn.style.cursor = "not-allowed";
+    esBtn.onclick = () => {
+      alert("Girdiğiniz aktivasyon kodu yalnızca İngilizce paketini kapsamaktadır.");
+    };
+  }
+}
+
+function selectLanguage(lang) {
+  currentLanguage = lang;
+  localStorage.setItem("active_language", lang);
+
+  // Dynamic UI Strings update
+  updateUIStrings(lang);
+
+  const langGate = document.getElementById("languageGate");
+  if(langGate) langGate.style.display = "none";
+
+  const levelGate = document.getElementById("levelGate");
+  if(levelGate) levelGate.style.display = "flex";
+}
 
 /* ================= ROUTING & LEVEL CONTROL ================= */
 function chooseLevel(level){
@@ -564,11 +717,12 @@ function setMode(mode){
 }
 
 function renderMode(){
+  const t = uiTranslations[currentLanguage] || uiTranslations.en;
   const title = document.getElementById("panelTitle");
   if(title){
-    if(currentMode === "vocabulary") title.innerText = "Vocabulary Challenge";
-    if(currentMode === "grammar") title.innerText = "Grammar Challenge";
-    if(currentMode === "match") title.innerText = "Match Challenge";
+    if(currentMode === "vocabulary") title.innerText = t.vocabChallenge;
+    if(currentMode === "grammar") title.innerText = t.grammarChallenge;
+    if(currentMode === "match") title.innerText = t.matchChallenge;
   }
 
   const qBox = document.getElementById("question");
@@ -598,12 +752,13 @@ function renderMode(){
 /* ================= DATA PROCESSING ================= */
 function getVocabBank(){
   const level = String(currentLevel || "A1").toUpperCase();
-  const key = "vocab_" + level;
+  const langPrefix = currentLanguage === "es" ? "spanish_vocab_" : "vocab_";
+  const key = langPrefix + level;
   let raw = window[key];
 
   if(!Array.isArray(raw)){
     console.warn("VOCAB NOT FOUND FOR LEVEL:", level, "→ FALLBACK A1 USED");
-    raw = window.vocab_A1 || [];
+    raw = window[langPrefix + "A1"] || window.vocab_A1 || [];
   }
 
   if(!cache.vocab[key]){
@@ -620,8 +775,9 @@ function getVocabBank(){
 }
 
 function getGrammarBank(){
-  const key = "grammar_" + currentLevel;
-  if(!cache.grammar[key]) cache.grammar[key] = window[key] || [];
+  const langPrefix = currentLanguage === "es" ? "spanish_grammar_" : "grammar_";
+  const key = langPrefix + currentLevel;
+  if(!cache.grammar[key]) cache.grammar[key] = window[key] || window["grammar_" + currentLevel] || [];
   return cache.grammar[key];
 }
 
@@ -632,7 +788,7 @@ function modIndeksiniSifirla() {
   if(currentMode === "grammar") window.GRAMMAR_INDEX = 0;
   if(currentMode === "match") window.MATCH_INDEX = 0;
   
-  syncEconomy(); // Sıfırlanan indeksi anında hem LocalStorage hem de Redis'e basar
+  syncEconomy();
   renderMode();
 }
 
@@ -659,7 +815,6 @@ function loadVocabularyMode(){
     return;
   }
 
-  // 🏁 BİTİŞ KONTROLÜ: Eğer mevcut indeks soru bankası boyutuna ulaştıysa bitiş ekranını bas
   if (currentIndex >= bank.length) {
     renderBitisEkrani("Bu seviyedeki tüm kelime sorularını başarıyla tamamladınız.");
     return;
@@ -720,7 +875,6 @@ function loadGrammarMode(){
     return;
   }
 
-  // 🏁 BİTİŞ KONTROLÜ
   if (currentIndex >= bank.length) {
     renderBitisEkrani("Bu seviyedeki tüm gramer yapılarını başarıyla tamamladınız.");
     return;
@@ -782,13 +936,11 @@ function loadMatchMode(){
     return;
   }
 
-  // 🏁 BİTİŞ KONTROLÜ: Eşleştirme modunda her adımda 5 kelime tüketildiği için (indeks * 5) hesabı yapılır
   if ((currentIndex * 5) >= bank.length) {
     renderBitisEkrani("Bu seviyedeki tüm kelime eşleştirmelerini başarıyla tamamladınız.");
     return;
   }
 
-  // Her seferinde indeks sırasına göre sonraki 5 kelimeyi getirir
   const startIdx = (currentIndex * 5) % bank.length;
   const data = bank.slice(startIdx, startIdx + 5);
   
@@ -908,10 +1060,7 @@ function syncEconomy(){
 }
 
 function updateStats(){
-  const cEl = document.getElementById("correct");
-  const wEl = document.getElementById("wrong");
-  if(cEl) cEl.innerText = correct;
-  if(wEl) wEl.innerText = wrong;
+  updateUIStrings(currentLanguage);
 }
 
 function restoreProgressFromServer(progress) {
@@ -942,16 +1091,20 @@ function restoreProgressFromServer(progress) {
 function koduManuelGirisEkraniGoster(mesaj = "") {
   const gate = document.getElementById("levelGate");
   const app = document.getElementById("app");
+  const langGate = document.getElementById("languageGate");
   if(gate) gate.style.display = "none";
   if(app) app.style.display = "none";
+  if(langGate) langGate.style.display = "none";
+
+  const t = uiTranslations[currentLanguage] || uiTranslations.en;
 
   document.body.innerHTML = `
     <div style="background:#000; height:100vh; width:100vw; display:flex; flex-direction:column; justify-content:center; align-items:center; margin:0; padding:0; font-family:Arial, sans-serif;">
         <div style="width:85%; max-width:340px; display:flex; flex-direction:column; align-items:center; gap:24px;">
-            <h1 style="color:white; font-size:42px; font-weight:bold; letter-spacing:0.5px; margin:0; font-family:sans-serif;">Login</h1>
+            <h1 id="loginTitleText" style="color:white; font-size:42px; font-weight:bold; letter-spacing:0.5px; margin:0; font-family:sans-serif;">${t.loginTitle}</h1>
             ${mesaj ? `<p style="color:#ef4444; font-weight:bold; font-size:14px; text-align:center; margin:-10px 0 0 0;">${mesaj}</p>` : ''}
-            <input type="text" id="manualCodeInput" placeholder="Kodu Giriniz" style="width:100%; height:62px; background:white; border:none; border-radius:18px; color:black; font-size:22px; font-weight:normal; padding:0 24px; box-shadow:0 4px 15px rgba(0,0,0,0.3); outline:none; text-align:left;">
-            <button id="btnVerifyCode" onclick="manuelKodOnayla()" style="width:100%; height:58px; background:#1868f9; color:white; font-size:20px; font-weight:bold; border:none; border-radius:18px; cursor:pointer; transition:background 0.2s ease; box-shadow:0 4px 15px rgba(24,104,249,0.2);">Login</button>
+            <input type="text" id="manualCodeInput" placeholder="${t.loginPlaceholder}" style="width:100%; height:62px; background:white; border:none; border-radius:18px; color:black; font-size:22px; font-weight:normal; padding:0 24px; box-shadow:0 4px 15px rgba(0,0,0,0.3); outline:none; text-align:left;">
+            <button id="btnVerifyCode" onclick="manuelKodOnayla()" style="width:100%; height:58px; background:#1868f9; color:white; font-size:20px; font-weight:bold; border:none; border-radius:18px; cursor:pointer; transition:background 0.2s ease; box-shadow:0 4px 15px rgba(24,104,249,0.2);">${t.loginBtn}</button>
         </div>
     </div>
   `;
@@ -1085,17 +1238,10 @@ window.addEventListener("DOMContentLoaded", async () => {
 
       if (data.success) {
         if (data.progress) restoreProgressFromServer(data.progress);
-        
-        const urlLevel = urlParams.get("level");
-        const validLevels = ["A1", "A2", "B1", "B2", "C1"];
-
-        if (urlLevel && validLevels.includes(urlLevel.toUpperCase())) {
-          chooseLevel(urlLevel.toUpperCase());
-        } else {
-          const levelGate = document.getElementById("levelGate");
-          if (levelGate) levelGate.style.display = "flex";
-        }
         updateStats();
+
+        // 🌟 DİL SEÇİM EKRANINI TETİKLE
+        showLanguageSelection(data.languages || ["en"]);
         return; 
       }
     } catch (e) {
@@ -1105,9 +1251,7 @@ window.addEventListener("DOMContentLoaded", async () => {
 
   koduManuelGirisEkraniGoster();
 });
-      
 
 </script>
 </body>
 </html>
-
