@@ -790,12 +790,21 @@ function getGrammarBank(){
 
 /* ================= RESET ENGINE (BAŞA DÖNME SİSTEMİ) ================= */
 function modIndeksiniSifirla() {
+  // Mod indekslerini sıfırla
   currentIndex = 0;
   if(currentMode === "vocabulary") window.VOCAB_INDEX = 0;
   if(currentMode === "grammar") window.GRAMMAR_INDEX = 0;
   if(currentMode === "match") window.MATCH_INDEX = 0;
   
+  // Doğru ve Yanlış sayaçlarını sıfırla
+  correct = 0;
+  wrong = 0;
+
+  // Skor arayüzünü ve lokal/sunucu verilerini güncelle
+  updateStats();
   syncEconomy();
+
+  // Ekranı yeni sıfırlanmış verilerle tekrar çiz
   renderMode();
 }
 
