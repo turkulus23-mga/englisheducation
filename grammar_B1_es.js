@@ -5,7 +5,7 @@
 // Edited: merged 2 parts into a single 100-question file
 // =====================================================
 
-window.grammar_B1 = [
+window.spanish_grammar_B1 = [
 
 /* =================================
    PRESENTE DE SUBJUNTIVO
