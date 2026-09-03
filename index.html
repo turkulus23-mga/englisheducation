@@ -682,9 +682,11 @@ function chooseLevel(level){
 
   currentLevel = safeLevel;
   
-  window.VOCAB_INDEX = Number(localStorage.getItem("vocab_index_" + currentLevel) || 0);
-  window.GRAMMAR_INDEX = Number(localStorage.getItem("grammar_index_" + currentLevel) || 0);
-  window.MATCH_INDEX = Number(localStorage.getItem("match_index_" + currentLevel) || 0);
+  // Dil ön eki (currentLanguage) entegre edildi
+  const langKey = currentLanguage + "_" + currentLevel;
+  window.VOCAB_INDEX = Number(localStorage.getItem("vocab_index_" + langKey) || 0);
+  window.GRAMMAR_INDEX = Number(localStorage.getItem("grammar_index_" + langKey) || 0);
+  window.MATCH_INDEX = Number(localStorage.getItem("match_index_" + langKey) || 0);
   
   currentIndex = window.VOCAB_INDEX;
 
@@ -1054,9 +1056,11 @@ function syncEconomy(){
   localStorage.setItem("correct", correct);
   localStorage.setItem("wrong", wrong);
   
-  localStorage.setItem("vocab_index_" + currentLevel, window.VOCAB_INDEX || 0);
-  localStorage.setItem("grammar_index_" + currentLevel, window.GRAMMAR_INDEX || 0);
-  localStorage.setItem("match_index_" + currentLevel, window.MATCH_INDEX || 0);
+  // Dil ön eki (currentLanguage) entegre edildi
+  const langKey = currentLanguage + "_" + currentLevel;
+  localStorage.setItem("vocab_index_" + langKey, window.VOCAB_INDEX || 0);
+  localStorage.setItem("grammar_index_" + langKey, window.GRAMMAR_INDEX || 0);
+  localStorage.setItem("match_index_" + langKey, window.MATCH_INDEX || 0);
 
   const dId = getDeviceFingerprint();
   fetch('/api/verify', {
@@ -1065,6 +1069,7 @@ function syncEconomy(){
     body: JSON.stringify({
       action: 'indeks_kaydet',
       deviceId: dId,
+      language: currentLanguage,
       levelKey: currentLevel,
       vocabIndex: window.VOCAB_INDEX || 0,
       grammarIndex: window.GRAMMAR_INDEX || 0,
@@ -1091,13 +1096,13 @@ function restoreProgressFromServer(progress) {
     localStorage.setItem("wrong", wrong);
   }
 
-  Object.keys(progress).forEach(level => {
-    if (level === "correct" || level === "wrong") return;
-    const lvlData = progress[level];
+  Object.keys(progress).forEach(key => {
+    if (key === "correct" || key === "wrong") return;
+    const lvlData = progress[key];
     if (lvlData) {
-      if (lvlData.vocabIndex !== undefined) localStorage.setItem("vocab_index_" + level, lvlData.vocabIndex);
-      if (lvlData.grammarIndex !== undefined) localStorage.setItem("grammar_index_" + level, lvlData.grammarIndex);
-      if (lvlData.matchIndex !== undefined) localStorage.setItem("match_index_" + level, lvlData.matchIndex);
+      if (lvlData.vocabIndex !== undefined) localStorage.setItem("vocab_index_" + key, lvlData.vocabIndex);
+      if (lvlData.grammarIndex !== undefined) localStorage.setItem("grammar_index_" + key, lvlData.grammarIndex);
+      if (lvlData.matchIndex !== undefined) localStorage.setItem("match_index_" + key, lvlData.matchIndex);
     }
   });
   updateStats();
@@ -1271,3 +1276,4 @@ window.addEventListener("DOMContentLoaded", async () => {
 </script>
 </body>
 </html>
+
