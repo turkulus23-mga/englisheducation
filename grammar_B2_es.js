@@ -5,7 +5,7 @@
 // Verified: 100 questions, no errors found
 // =====================================================
 
-window.grammar_B2 = [
+window.spanish_grammar_B2 = [
 
 /* =================================
    IMPERFECTO DE SUBJUNTIVO
