@@ -762,14 +762,21 @@ function getVocabBank(){
   }
 
   if(!cache.vocab[key]){
-    cache.vocab[key] = raw.filter(item =>
-      item &&
-      typeof item.en === "string" &&
-      typeof item.tr === "string" &&
-      item.en.trim().length > 0 &&
-      item.tr.trim().length > 0 &&
-      item.tr !== "-------"
-    );
+    const wordKey = currentLanguage === "es" ? "es" : "en";
+    
+    cache.vocab[key] = raw
+      .filter(item =>
+        item &&
+        typeof item[wordKey] === "string" &&
+        typeof item.tr === "string" &&
+        item[wordKey].trim().length > 0 &&
+        item.tr.trim().length > 0 &&
+        item.tr !== "-------"
+      )
+      .map(item => ({
+        en: item[wordKey],
+        tr: item.tr
+      }));
   }
   return cache.vocab[key];
 }
