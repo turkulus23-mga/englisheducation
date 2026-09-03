@@ -5,7 +5,7 @@
 // Edited: fixed to exactly 100 questions
 // =====================================================
 
-window.grammar_A1 = [
+window.spanish_grammar_A1 = [
 
 /* =================================
    ARTICLES / GENDER
