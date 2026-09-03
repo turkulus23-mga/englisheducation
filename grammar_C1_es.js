@@ -4,7 +4,7 @@
 // CEFR C1 Compatible
 // =====================================================
 
-window.grammar_C1 = [
+window.spanish_grammar_C1 = [
 
 /* =================================
    ADVANCED SUBJUNCTIVE CONJUNCTIONS
