@@ -62,9 +62,20 @@ export default async function handler(req, res) {
       if (!code) return res.status(400).json({ error: 'Kod eksik' });
       const temizKod = code.trim().toUpperCase();
 
-      const onaylananSeviye = allCodes[temizKod];
-      if (!onaylananSeviye) {
+      const rawConfig = allCodes[temizKod];
+      if (!rawConfig) {
         return res.status(400).json({ error: 'Geçersiz aktivasyon kodu!' });
+      }
+
+      // ÇİFT DİL KONTROL ENTEGRASYONU (Eski string ise varsayılan İngilizce, Obje ise diller okunur)
+      let onaylananSeviye = "A1";
+      let allowedLanguages = ["en"];
+
+      if (typeof rawConfig === 'object') {
+        onaylananSeviye = rawConfig.level || "ALL";
+        allowedLanguages = rawConfig.languages || ["en"];
+      } else {
+        onaylananSeviye = rawConfig; // Eski usül "A1", "ALL" string mantığı
       }
 
       // KOD KİLİTLEME (RACE CONDITION ÇÖZÜMÜ)
@@ -77,14 +88,24 @@ export default async function handler(req, res) {
         }
       }
 
-      // 5 YILLIK TOKEN ÜRETİMİ
-      const tokenPayload = JSON.stringify({ level: onaylananSeviye, deviceId: deviceId });
+      // 5 YILLIK TOKEN ÜRETİMİ (Dil yetkileri payload'a eklenir)
+      const tokenPayload = JSON.stringify({ 
+        level: onaylananSeviye, 
+        languages: allowedLanguages,
+        deviceId: deviceId 
+      });
       const rastgeleToken = 'TOKEN_' + crypto.randomBytes(24).toString('hex');
       await redis.set(`token:${rastgeleToken}`, tokenPayload, { EX: FIVE_YEARS_IN_SECONDS });
       
       const progress = await getDeviceProgress(redis, deviceId);
 
-      return res.status(200).json({ success: true, token: rastgeleToken, level: onaylananSeviye, progress: progress });
+      return res.status(200).json({ 
+        success: true, 
+        token: rastgeleToken, 
+        level: onaylananSeviye, 
+        languages: allowedLanguages,
+        progress: progress 
+      });
     }
 
     // ================= CİHAZ TOKEN DOĞRULAMA =================
@@ -93,14 +114,18 @@ export default async function handler(req, res) {
       const rawTokenData = await redis.get(`token:${token}`);
       
       if (rawTokenData) {
-        let level = rawTokenData;
+        let level = "ALL";
+        let languages = ["en"];
         let verifiedDeviceId = deviceId;
 
         try {
           if (rawTokenData.startsWith('{')) {
             const parsed = JSON.parse(rawTokenData);
             level = parsed.level;
+            languages = parsed.languages || ["en"];
             verifiedDeviceId = parsed.deviceId || deviceId;
+          } else {
+            level = rawTokenData;
           }
         } catch (e) {}
 
@@ -108,7 +133,12 @@ export default async function handler(req, res) {
         await redis.expire(`token:${token}`, FIVE_YEARS_IN_SECONDS);
 
         const progress = await getDeviceProgress(redis, verifiedDeviceId);
-        return res.status(200).json({ success: true, level: level, progress: progress });
+        return res.status(200).json({ 
+          success: true, 
+          level: level, 
+          languages: languages, 
+          progress: progress 
+        });
       } else {
         return res.status(400).json({ error: 'Oturum süresi dolmuş veya geçersiz!' });
       }
