@@ -2,7 +2,6 @@ import { createClient } from 'redis';
 import crypto from 'crypto';
 
 let redisClient = null;
-let cachedCodes = null;
 
 // 5 Yıllık Süre (Saniye cinsinden: 5 * 365 * 24 * 60 * 60)
 const FIVE_YEARS_IN_SECONDS = 60 * 60 * 24 * 365 * 5;
@@ -17,17 +16,15 @@ async function getRedis() {
   return redisClient;
 }
 
+// BÖLGE: Önbellekleme kaldırıldı, Vercel Env Değişiklikleri anında okunur
 function getActivationCodes() {
-  if (!cachedCodes) {
-    try {
-      const rawData = process.env.ALL_ACTIVATION_CODES || '{}';
-      cachedCodes = JSON.parse(rawData);
-    } catch (e) {
-      console.error('Env kodları parse edilemedi:', e);
-      cachedCodes = {};
-    }
+  try {
+    const rawData = process.env.ALL_ACTIVATION_CODES || '{}';
+    return JSON.parse(rawData);
+  } catch (e) {
+    console.error('Env kodları parse edilemedi:', e);
+    return {};
   }
-  return cachedCodes;
 }
 
 async function getDeviceProgress(redis, deviceId) {
@@ -67,15 +64,15 @@ export default async function handler(req, res) {
         return res.status(400).json({ error: 'Geçersiz aktivasyon kodu!' });
       }
 
-      // ÇİFT DİL KONTROL ENTEGRASYONU (Eski string ise varsayılan İngilizce, Obje ise diller okunur)
-      let onaylananSeviye = "A1";
+      // ÇİFT DİL KONTROL ENTEGRASYONU
+      let onaylananSeviye = "ALL";
       let allowedLanguages = ["en"];
 
       if (typeof rawConfig === 'object') {
         onaylananSeviye = rawConfig.level || "ALL";
-        allowedLanguages = rawConfig.languages || ["en"];
+        allowedLanguages = Array.isArray(rawConfig.languages) ? rawConfig.languages : ["en"];
       } else {
-        onaylananSeviye = rawConfig; // Eski usül "A1", "ALL" string mantığı
+        onaylananSeviye = rawConfig; // Eski string mantığı
       }
 
       // KOD KİLİTLEME (RACE CONDITION ÇÖZÜMÜ)
@@ -121,15 +118,15 @@ export default async function handler(req, res) {
         try {
           if (rawTokenData.startsWith('{')) {
             const parsed = JSON.parse(rawTokenData);
-            level = parsed.level;
-            languages = parsed.languages || ["en"];
+            level = parsed.level || "ALL";
+            languages = Array.isArray(parsed.languages) ? parsed.languages : ["en"];
             verifiedDeviceId = parsed.deviceId || deviceId;
           } else {
             level = rawTokenData;
           }
         } catch (e) {}
 
-        // Her doğrulamada token süresini 5 yıl daha uzatıyoruz (Sürekli aktif kalması için)
+        // Token süresini 5 yıl daha uzatıyoruz
         await redis.expire(`token:${token}`, FIVE_YEARS_IN_SECONDS);
 
         const progress = await getDeviceProgress(redis, verifiedDeviceId);
@@ -164,7 +161,6 @@ export default async function handler(req, res) {
       if (correct !== undefined) currentProgress.correct = Number(correct);
       if (wrong !== undefined) currentProgress.wrong = Number(wrong);
 
-      // İlerleme kaydedilirken süreyi 5 yıl olarak yeniliyoruz
       await redis.set(`progress:${deviceId}`, JSON.stringify(currentProgress), { EX: FIVE_YEARS_IN_SECONDS });
 
       return res.status(200).json({ success: true });
