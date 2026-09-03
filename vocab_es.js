@@ -1,4 +1,4 @@
-window.vocab_A1 = [
+window.spanish_vocab_A1 = [
 { "es": "hola", "tr": "merhaba", "tema": "saludos" },
 { "es": "qué tal", "tr": "selam", "tema": "saludos" },
 { "es": "buenos días", "tr": "günaydın", "tema": "saludos" },
@@ -401,7 +401,7 @@ window.vocab_A1 = [
 { "es": "la salchicha (f)", "tr": "sosis", "tema": "alimentos" }
 ];
 
-window.vocab_A2 = [
+window.spanish_vocab_A2 = [
 { "es": "el pasaporte (m)", "tr": "pasaport", "tema": "viajes" },
 { "es": "el billete (m)", "tr": "bilet", "tema": "viajes" },
 { "es": "la reserva (f)", "tr": "rezervasyon (yer ayırtma)", "tema": "viajes" },
@@ -904,7 +904,7 @@ window.vocab_A2 = [
 { "es": "el análisis de sangre (m)", "tr": "kan testi", "tema": "salud" }
 ];
 
-window.vocab_B1 = [
+window.spanish_vocab_B1 = [
 { "es": "la comunidad (f)", "tr": "topluluk", "tema": "sociedad" },
 { "es": "el ciudadano (m)", "tr": "vatandaş", "tema": "sociedad" },
 { "es": "la cultura (f)", "tr": "kültür", "tema": "sociedad" },
@@ -1507,7 +1507,7 @@ window.vocab_B1 = [
 { "es": "el equilibrio entre trabajo y vida (m)", "tr": "iş-yaşam dengesi", "tema": "trabajo" }
 ];
 
-window.vocab_B2 = [
+window.spanish_vocab_B2 = [
 { "es": "lograr (v)", "tr": "tamamlamak (başarmak)", "tema": "verbos" },
 { "es": "alcanzar (v)", "tr": "başarmak", "tema": "verbos" },
 { "es": "adquirir (v)", "tr": "edinmek", "tema": "verbos" },
@@ -2210,7 +2210,7 @@ window.vocab_B2 = [
 { "es": "desplomarse (v)", "tr": "aniden düşmek", "tema": "verbos" }
 ];
 
-window.vocab_C1 = [
+window.spanish_vocab_C1 = [
 { "es": "la epistemología (f)", "tr": "bilgi felsefesi", "tema": "filosofía" },
 { "es": "la ontología (f)", "tr": "varlık felsefesi", "tema": "filosofía" },
 { "es": "la axiología (f)", "tr": "değer felsefesi", "tema": "filosofía" },
