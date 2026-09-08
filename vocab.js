@@ -469,7 +469,7 @@ window.vocab_A2 = [
 { "en": "snack", "tr": "atıştırmalık", "topic": "food_drink" },
 { "en": "drink", "tr": "içecek", "topic": "food_drink" },
 { "en": "vegetable", "tr": "sebze", "topic": "food_drink" },
-{ "en": "fruit juice", "tr": "meyve suyu (özellikle meyveden)", "topic": "food_drink" },
+{ "en": "fruit juice", "tr": "meyve suyu", "topic": "food_drink" },
 { "en": "restaurant", "tr": "restoran", "topic": "food_drink" },
 { "en": "headache", "tr": "baş ağrısı", "topic": "health" },
 { "en": "fever", "tr": "ateş", "topic": "health" },
