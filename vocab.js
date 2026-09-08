@@ -866,7 +866,7 @@ window.vocab_A2 = [
 { "en": "rather", "tr": "tercihen", "topic": "preferences" },
 { "en": "club", "tr": "kulüp", "topic": "social" },
 { "en": "gathering", "tr": "toplanma", "topic": "social" },
-{ "en": "host", "tr": "ev sahibi (davet)", "topic": "social" },
+{ "en": "host", "tr": "ev sahibi (davet sahibi)", "topic": "social" },
 { "en": "acquaintance", "tr": "tanıdık (kişi)", "topic": "social" },
 { "en": "stranger", "tr": "yabancı (tanımadığı kişi)", "topic": "social" },
 { "en": "referee", "tr": "hakem", "topic": "sports" },
