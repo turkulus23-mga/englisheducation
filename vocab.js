@@ -503,7 +503,7 @@ window.vocab_A2 = [
 { "en": "tablet", "tr": "tablet", "topic": "technology" },
 { "en": "opinion", "tr": "fikir", "topic": "communication" },
 { "en": "question", "tr": "soru", "topic": "communication" },
-{ "en": "answer", "tr": "cevap (soruya)", "topic": "communication" },
+{ "en": "answer", "tr": "cevap", "topic": "communication" },
 { "en": "explain", "tr": "açıklamak", "topic": "communication" },
 { "en": "agree", "tr": "katılmak (fikre)", "topic": "communication" },
 { "en": "disagree", "tr": "katılmamak", "topic": "communication" },
