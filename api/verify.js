@@ -3,7 +3,7 @@ import crypto from 'crypto';
 
 let redisClient = null;
 
-// 5 Yıllık Süre (Saniye cinsinden: 5 * 365 * 24 * 60 * 60)
+// 5 Yıllık Süre (Saniye cinsinden)
 const FIVE_YEARS_IN_SECONDS = 60 * 60 * 24 * 365 * 5;
 
 async function getRedis() {
@@ -16,7 +16,6 @@ async function getRedis() {
   return redisClient;
 }
 
-// BÖLGE: Önbellekleme kaldırıldı, Vercel Env Değişiklikleri anında okunur
 function getActivationCodes() {
   try {
     const rawData = process.env.ALL_ACTIVATION_CODES || '{}';
@@ -46,13 +45,21 @@ export default async function handler(req, res) {
   if (req.method === 'OPTIONS') return res.status(200).end();
 
   try {
-    const action = req.body?.action || req.query?.admin; 
+    const action = req.body?.action || req.query?.action || req.query?.admin; 
     const code = req.body?.code || req.query?.kod;
     const token = req.body?.token || req.query?.token;
     const deviceId = req.body?.deviceId || "UNKNOWN_DEV";
 
-    const allCodes = getActivationCodes();
     const redis = await getRedis();
+
+    // ================= OTOMATİK PING / KEEPALIVE =================
+    // Dış cron servislerinin çağırabileceği hafif ping endpoint'i
+    if (action === 'ping' || req.query?.ping === 'true') {
+      await redis.set('keepalive', new Date().toISOString());
+      return res.status(200).json({ success: true, message: 'Redis canlı tutuldu.' });
+    }
+
+    const allCodes = getActivationCodes();
 
     // ================= ÖĞRENCİ GİRİŞ KONTROLÜ =================
     if (action === 'kontrol_et') {
@@ -64,7 +71,6 @@ export default async function handler(req, res) {
         return res.status(400).json({ error: 'Geçersiz aktivasyon kodu!' });
       }
 
-      // ÇİFT DİL KONTROL ENTEGRASYONU
       let onaylananSeviye = "ALL";
       let allowedLanguages = ["en"];
 
@@ -72,10 +78,9 @@ export default async function handler(req, res) {
         onaylananSeviye = rawConfig.level || "ALL";
         allowedLanguages = Array.isArray(rawConfig.languages) ? rawConfig.languages : ["en"];
       } else {
-        onaylananSeviye = rawConfig; // Eski string mantığı
+        onaylananSeviye = rawConfig;
       }
 
-      // KOD KİLİTLEME (RACE CONDITION ÇÖZÜMÜ)
       const setSuccess = await redis.set(`used:${temizKod}`, deviceId, { NX: true });
       
       if (!setSuccess) {
@@ -85,7 +90,6 @@ export default async function handler(req, res) {
         }
       }
 
-      // 5 YILLIK TOKEN ÜRETİMİ (Dil yetkileri payload'a eklenir)
       const tokenPayload = JSON.stringify({ 
         level: onaylananSeviye, 
         languages: allowedLanguages,
@@ -126,7 +130,6 @@ export default async function handler(req, res) {
           }
         } catch (e) {}
 
-        // Token süresini 5 yıl daha uzatıyoruz
         await redis.expire(`token:${token}`, FIVE_YEARS_IN_SECONDS);
 
         const progress = await getDeviceProgress(redis, verifiedDeviceId);
@@ -165,6 +168,9 @@ export default async function handler(req, res) {
 
       return res.status(200).json({ success: true });
     }
+
+    // Varsayılan erişimde de Redis'e erişip sayacı sıfırlar
+    await redis.set('keepalive', new Date().toISOString());
 
     res.setHeader('Content-Type', 'text/html; charset=utf-8');
     return res.status(200).send('<h1>✅ AI Teacher Sistemi Çelik Gibi Aktif!</h1>');
