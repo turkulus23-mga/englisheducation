@@ -3,5 +3,11 @@
   "routes": [
     { "src": "/api/(.*)", "dest": "/api/$1.js" },
     { "src": "/(.*)", "dest": "/$1" }
+  ],
+  "crons": [
+    {
+      "path": "/api/verify?action=ping",
+      "schedule": "0 3 * * *"
+    }
   ]
 }
