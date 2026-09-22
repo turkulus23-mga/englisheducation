@@ -7,7 +7,7 @@
   "crons": [
     {
       "path": "/api/verify?action=ping",
-      "schedule": "0 3 * * *"
+      "schedule": "13 * * * *"
     }
   ]
 }
