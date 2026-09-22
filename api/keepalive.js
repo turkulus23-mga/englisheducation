@@ -29,8 +29,9 @@ async function getRedis() {
 }
 
 export default async function handler(req, res) {
-  // Sadece GET
-  if (req.method !== 'GET') {
+  // UptimeRobot Free HEAD kullanıyor.
+  // Tarayıcı testleri için GET de kabul ediyor.
+  if (req.method !== 'GET' && req.method !== 'HEAD') {
     return res.status(405).json({
       success: false,
       error: 'Method Not Allowed'
@@ -41,8 +42,7 @@ export default async function handler(req, res) {
     const redis = await getRedis();
 
     // Dakikada en fazla bir keepalive.
-    // Böylece biri endpoint'i sürekli çağırsa bile
-    // Redis'e gereksiz SET yağmuru oluşmaz.
+    // Gereksiz Redis SET yağmurunu önler.
     const allowed = await redis.set(
       'keepalive:rate-limit',
       '1',
@@ -64,6 +64,12 @@ export default async function handler(req, res) {
     // Redis Cloud için gerçek aktivite.
     await redis.set('keepalive', now);
 
+    // HEAD isteğinde response body gönderilmez.
+    if (req.method === 'HEAD') {
+      return res.status(200).end();
+    }
+
+    // GET isteğinde JSON döndür.
     return res.status(200).json({
       success: true,
       time: now
