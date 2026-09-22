@@ -2,8 +2,6 @@ import { createClient } from 'redis';
 
 let redisClient = null;
 
-const RATE_LIMIT_SECONDS = 60;
-
 async function getRedis() {
   if (redisClient?.isOpen) {
     return redisClient;
@@ -40,24 +38,6 @@ export default async function handler(req, res) {
 
   try {
     const redis = await getRedis();
-
-    // Dakikada en fazla bir keepalive.
-    // Gereksiz Redis SET yağmurunu önler.
-    const allowed = await redis.set(
-      'keepalive:rate-limit',
-      '1',
-      {
-        NX: true,
-        EX: RATE_LIMIT_SECONDS
-      }
-    );
-
-    if (!allowed) {
-      return res.status(429).json({
-        success: false,
-        error: 'Too Many Requests'
-      });
-    }
 
     const now = new Date().toISOString();
 
